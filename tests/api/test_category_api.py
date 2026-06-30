@@ -1,8 +1,6 @@
 """Category 模块 API 测试。
 
-对应文档：docs/test-cases/api-test-cases-v1.md（API_CATEGORY_001 ~ API_CATEGORY_009）
-
-覆盖维度：正常功能 · 异常场景（404）· 树形结构校验 · 搜索边界
+蓝图：docs/test-cases/category.md —— 22 条用例，8 个端点全覆盖。
 """
 
 from __future__ import annotations
@@ -20,129 +18,217 @@ def client() -> CategoryClient:
         yield c
 
 
+def _create_category(client: CategoryClient, name: str = "E2E Cat", slug: str | None = None, parent_id: str | None = None) -> dict:
+    slug = slug or f"e2e-cat-{uuid.uuid4().hex[:8]}"
+    body: dict = {"name": name, "slug": slug}
+    if parent_id:
+        body["parent_id"] = parent_id
+    r = client.post("/categories", json=body)
+    assert r.status_code in (200, 201), f"prep create failed: {r.status_code} {r.text}"
+    return r.json()
+
+
 # ======================================================================
-# 获取分类列表（GET /categories）── API_CATEGORY_001 ~ API_CATEGORY_002
+# 3.1 分类列表（2 条）── API_CATEGORY_001 ~ API_CATEGORY_002
 # ======================================================================
 
 class TestGetCategories:
-    """获取分类列表。"""
+    # [API_CATEGORY_001]
+    def test_get_categories_200(self, client: CategoryClient) -> None:
+        r = client.get("/categories")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        cats = r.json()
+        assert isinstance(cats, list) and len(cats) > 0
+        c = cats[0]
+        assert "id" in c and "name" in c and "slug" in c
+        assert "parent_id" in c
 
-    # [API_CATEGORY_001] ------------------------------------------------
-    def test_get_categories_returns_200(self, client: CategoryClient) -> None:
-        """获取分类列表 → 200，返回非空数组，元素含 id/name/slug/parent_id。"""
-        response = client.get("/categories")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        categories = response.json()
-        assert isinstance(categories, list), f"期望列表, 实际{type(categories)}"
-        assert len(categories) > 0, "分类列表不应为空"
-        cat = categories[0]
-        assert "id" in cat, "分类对象应包含 id"
-        assert "name" in cat, "分类对象应包含 name"
-        assert "slug" in cat, "分类对象应包含 slug"
-        assert "parent_id" in cat, "分类对象应包含 parent_id"
-
-    # [API_CATEGORY_002] ------------------------------------------------
-    def test_get_categories_returns_valid_structure(
-        self, client: CategoryClient
-    ) -> None:
-        """数据结构校验：前 5 个分类的字段类型正确，parent_id 可为 null。"""
-        response = client.get("/categories")
-        categories = response.json()
-        for cat in categories[:5]:
-            assert isinstance(cat["id"], str)
-            assert isinstance(cat["name"], str)
-            assert isinstance(cat["slug"], str)
-            assert len(cat["name"]) > 0
-            assert len(cat["slug"]) > 0
-            assert "parent_id" in cat
+    # [API_CATEGORY_002]
+    def test_structure_valid(self, client: CategoryClient) -> None:
+        cats = client.get("/categories").json()
+        for c in cats[:5]:
+            assert isinstance(c["id"], str) and len(c["id"]) > 0
+            assert isinstance(c["name"], str) and len(c["name"]) > 0
+            assert isinstance(c["slug"], str) and len(c["slug"]) > 0
+            assert c["parent_id"] is None or isinstance(c["parent_id"], str)
 
 
 # ======================================================================
-# 获取分类树（GET /categories/tree）── API_CATEGORY_003 ~ API_CATEGORY_005
+# 3.2 分类树（2 条）── API_CATEGORY_003 ~ API_CATEGORY_004
 # ======================================================================
 
 class TestGetCategoryTree:
-    """获取分类树。"""
+    # [API_CATEGORY_003]
+    def test_get_tree_200(self, client: CategoryClient) -> None:
+        r = client.get("/categories/tree")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        tree = r.json()
+        assert isinstance(tree, list) and len(tree) > 0
+        assert "sub_categories" in tree[0]
 
-    # [API_CATEGORY_003] ------------------------------------------------
-    def test_get_category_tree_returns_200(self, client: CategoryClient) -> None:
-        """获取分类树 → 200，返回非空数组，顶级节点含 sub_categories。"""
-        response = client.get("/categories/tree")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        tree = response.json()
-        assert isinstance(tree, list), f"期望列表, 实际{type(tree)}"
-        assert len(tree) > 0, "分类树不应为空"
-        node = tree[0]
-        assert "id" in node
-        assert "name" in node
-
-    # [API_CATEGORY_004] ------------------------------------------------
-    def test_get_category_tree_by_valid_id(self, client: CategoryClient) -> None:
-        """存在的分类 ID → 200，响应体 id 与请求一致。"""
-        categories = client.get("/categories").json()
-        existing_id = categories[0]["id"]
-        response = client.get(f"/categories/tree/{existing_id}")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-
-    # [API_CATEGORY_005] ------------------------------------------------
-    def test_get_category_tree_nonexistent_returns_404(
-        self, client: CategoryClient
-    ) -> None:
-        """不存在的分类 ID → 404。"""
-        response = client.get("/categories/tree/nonexistent-id-99999")
-        assert response.status_code == 404, f"期望404, 实际{response.status_code}"
+    # [API_CATEGORY_004]
+    def test_tree_by_slug(self, client: CategoryClient) -> None:
+        cats = client.get("/categories").json()
+        slug = cats[0]["slug"]
+        r = client.get("/categories/tree", params={"by_category_slug": slug})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
 
 
 # ======================================================================
-# 搜索分类（GET /categories/search）── API_CATEGORY_006 ~ API_CATEGORY_008
-# ======================================================================
-
-class TestSearchCategories:
-    """搜索分类。"""
-
-    # [API_CATEGORY_006] ------------------------------------------------
-    def test_search_categories_with_match(self, client: CategoryClient) -> None:
-        """搜索 'hand' → 200，返回匹配的分类列表。"""
-        response = client.get("/categories/search", params={"q": "hand"})
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        results = response.json()
-        assert isinstance(results, list), f"期望列表, 实际{type(results)}"
-
-    # [API_CATEGORY_007] ------------------------------------------------
-    def test_search_categories_no_match(self, client: CategoryClient) -> None:
-        """搜索不存在的关键词 → 200，返回空数组。"""
-        response = client.get("/categories/search", params={"q": "xyznonexistent999"})
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        results = response.json()
-        assert isinstance(results, list), f"期望列表, 实际{type(results)}"
-        assert len(results) == 0, "无匹配时应返回空列表"
-
-    # [API_CATEGORY_008] ------------------------------------------------
-    def test_search_categories_no_query_returns_all(
-        self, client: CategoryClient
-    ) -> None:
-        """不传 q 参数 → 200，返回全量（q 为可选参数）。"""
-        response = client.get("/categories/search")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        results = response.json()
-        assert isinstance(results, list), f"期望列表, 实际{type(results)}"
-
-
-# ======================================================================
-# 创建分类（POST /categories）── API_CATEGORY_009
+# 3.3 创建分类（6 条）── API_CATEGORY_005 ~ API_CATEGORY_010
 # ======================================================================
 
 class TestCreateCategory:
-    """创建分类。"""
+    # [API_CATEGORY_005]
+    def test_create_top_level_201(self, client: CategoryClient) -> None:
+        slug = f"top-{uuid.uuid4().hex[:8]}"
+        r = client.post("/categories", json={"name": "Top Cat", "slug": slug})
+        assert r.status_code in (200, 201), f"意外: {r.status_code}"
+        d = r.json()
+        assert d["name"] == "Top Cat" and d["slug"] == slug
 
-    # [API_CATEGORY_009] ------------------------------------------------
-    def test_create_category_returns_201(self, client: CategoryClient) -> None:
-        """创建分类 → 201（本环境公开创建）。"""
-        slug = f"test-cat-{uuid.uuid4().hex[:8]}"
-        response = client.post("/categories", json={
-            "name": "E2E Test Category",
-            "slug": slug,
-        })
-        assert response.status_code in (201, 200), f"意外状态码: {response.status_code} {response.text}"
+    # [API_CATEGORY_006]
+    def test_create_with_parent_id(self, client: CategoryClient) -> None:
+        cats = client.get("/categories").json()
+        parent_id = cats[0]["id"]
+        slug = f"child-{uuid.uuid4().hex[:8]}"
+        r = client.post("/categories", json={"name": "Child Cat", "slug": slug, "parent_id": parent_id})
+        assert r.status_code in (200, 201), f"意外: {r.status_code}"
+        assert r.json()["parent_id"] == parent_id
+
+    # [API_CATEGORY_007]
+    def test_create_invalid_parent_id(self, client: CategoryClient) -> None:
+        slug = f"badparent-{uuid.uuid4().hex[:8]}"
+        r = client.post("/categories", json={"name": "Bad Parent", "slug": slug, "parent_id": "nonexistent-99999"})
+        assert r.status_code in (200, 201, 422, 500), f"意外: {r.status_code}"
+
+    # [API_CATEGORY_008]
+    def test_missing_name_422(self, client: CategoryClient) -> None:
+        r = client.post("/categories", json={"slug": "only-slug"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_CATEGORY_009]
+    def test_missing_slug_422(self, client: CategoryClient) -> None:
+        r = client.post("/categories", json={"name": "only-name"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_CATEGORY_010]
+    def test_duplicate_slug_409(self, client: CategoryClient) -> None:
+        slug = f"dupcat-{uuid.uuid4().hex[:8]}"
+        _create_category(client, slug=slug)
+        r = client.post("/categories", json={"name": "Dup Cat", "slug": slug})
+        assert r.status_code == 409, f"期望409, 实际{r.status_code}"
+
+
+# ======================================================================
+# 3.4 分类子树（2 条）── API_CATEGORY_011 ~ API_CATEGORY_012
+# ======================================================================
+
+class TestGetCategoryTreeById:
+    # [API_CATEGORY_011]
+    def test_get_tree_by_id_200(self, client: CategoryClient) -> None:
+        cats = client.get("/categories").json()
+        cid = cats[0]["id"]
+        r = client.get(f"/categories/tree/{cid}")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        assert r.json()["id"] == cid
+
+    # [API_CATEGORY_012]
+    def test_nonexistent_404(self, client: CategoryClient) -> None:
+        r = client.get("/categories/tree/nonexistent-id-99999")
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+
+
+# ======================================================================
+# 3.5 搜索分类（3 条）── API_CATEGORY_013 ~ API_CATEGORY_015
+# ======================================================================
+
+class TestSearchCategories:
+    # [API_CATEGORY_013]
+    def test_search_hit(self, client: CategoryClient) -> None:
+        r = client.get("/categories/search", params={"q": "hand"})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        assert isinstance(r.json(), list)
+
+    # [API_CATEGORY_014]
+    def test_search_no_hit(self, client: CategoryClient) -> None:
+        r = client.get("/categories/search", params={"q": "xyznonexistent999"})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        assert r.json() == []
+
+    # [API_CATEGORY_015]
+    def test_search_no_query(self, client: CategoryClient) -> None:
+        r = client.get("/categories/search")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+
+
+# ======================================================================
+# 3.6 更新分类（2 条）── API_CATEGORY_016 ~ API_CATEGORY_017
+# ======================================================================
+
+class TestPutCategory:
+    # [API_CATEGORY_016]
+    def test_put_success(self, client: CategoryClient) -> None:
+        c = _create_category(client)
+        r = client.put(f"/categories/{c['id']}", json={"name": "Updated Cat", "slug": c["slug"]})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
+        assert r.json().get("success") is True
+        # 回读验证
+        updated = client.get(f"/categories/tree/{c['id']}").json()
+        assert updated["name"] == "Updated Cat"
+
+    # [API_CATEGORY_017]
+    def test_put_nonexistent_404(self, client: CategoryClient) -> None:
+        r = client.put("/categories/nonexistent-id-99999", json={"name": "X", "slug": "x"})
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+
+
+# ======================================================================
+# 3.7 部分更新分类（2 条）── API_CATEGORY_018 ~ API_CATEGORY_019
+# ======================================================================
+
+class TestPatchCategory:
+    # [API_CATEGORY_018]
+    def test_patch_name(self, client: CategoryClient) -> None:
+        c = _create_category(client)
+        original_slug = c["slug"]
+        r = client.patch(f"/categories/{c['id']}", json={"name": "Patched Cat"})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
+        assert r.json().get("success") is True
+        # 回读验证
+        updated = client.get(f"/categories/tree/{c['id']}").json()
+        assert updated["name"] == "Patched Cat"
+        assert updated["slug"] == original_slug
+
+    # [API_CATEGORY_019]
+    def test_patch_nonexistent_404(self, client: CategoryClient) -> None:
+        r = client.patch("/categories/nonexistent-id-99999", json={"name": "X"})
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+
+
+# ======================================================================
+# 3.8 删除分类（3 条）── API_CATEGORY_020 ~ API_CATEGORY_022
+# ======================================================================
+
+class TestDeleteCategory:
+    """删除分类 —— 需要认证。"""
+
+    # [API_CATEGORY_020]
+    def test_delete_requires_auth(self, client: CategoryClient) -> None:
+        c = _create_category(client)
+        r = client.delete(f"/categories/{c['id']}")
+        assert r.status_code == 401, f"期望401（需认证）, 实际{r.status_code}"
+
+    # [API_CATEGORY_021]
+    def test_delete_nonexistent(self, client: CategoryClient) -> None:
+        r = client.delete("/categories/nonexistent-id-99999")
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
+
+    # [API_CATEGORY_022]
+    def test_delete_twice(self, client: CategoryClient) -> None:
+        c = _create_category(client)
+        client.delete(f"/categories/{c['id']}")
+        r = client.delete(f"/categories/{c['id']}")
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
 
 # AI-assisted

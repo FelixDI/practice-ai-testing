@@ -1,13 +1,12 @@
 """User 模块 API 测试。
 
-对应文档：docs/test-cases/api-test-cases-v1.md（API_USER_001 ~ API_USER_023）
-
-覆盖维度：正常功能 · 异常场景（401/404/409/422）· 边界值（弱密码/非法邮箱/越界 dob）
+蓝图：docs/test-cases/user.md —— 56 条用例，13 个端点全覆盖。
 """
 
 from __future__ import annotations
 
 import uuid
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
@@ -17,6 +16,9 @@ from tests.conftest import generate_unique_email
 
 
 # ======================================================================
+# Helpers
+# ======================================================================
+
 VALID_PAYLOAD: dict[str, Any] = {
     "first_name": "Alice",
     "last_name": "Test",
@@ -30,331 +32,462 @@ VALID_PAYLOAD: dict[str, Any] = {
     },
     "dob": "1995-05-15",
 }
-# ======================================================================
+
+
+def _register(user_client: UserClient, email: str, **overrides: Any) -> dict[str, Any]:
+    data = dict(VALID_PAYLOAD)
+    data["email"] = email
+    data.update(overrides)
+    r = user_client.post("/users/register", json=data)
+    assert r.status_code == 201, f"prep register failed: {r.status_code} {r.text}"
+    return r.json()
 
 
 # ======================================================================
-# 注册（POST /users/register）── API_USER_001 ~ API_USER_007
+# 1.1 注册（17 条）── API_USER_001 ~ API_USER_017
 # ======================================================================
 
 class TestRegister:
-    """用户注册。"""
-
     @pytest.fixture
     def payload(self) -> dict[str, Any]:
-        data = dict(VALID_PAYLOAD)
-        data["email"] = generate_unique_email("register")
-        return data
+        d = dict(VALID_PAYLOAD)
+        d["email"] = generate_unique_email("reg")
+        return d
 
-    # [API_USER_001] --------------------------------------------------
-    def test_register_success(
-        self, user_client: UserClient, payload: dict[str, Any]
-    ) -> None:
-        """正常注册新用户 → 201，响应体包含 id / email / first_name / created_at。"""
+    # [API_USER_001]
+    def test_register_success(self, user_client: UserClient, payload: dict[str, Any]) -> None:
         response = user_client.post("/users/register", json=payload)
-        assert response.status_code == 201, f"期望201, 实际{response.status_code} {response.text}"
-        user = response.json()
-        assert user["email"] == payload["email"]
-        assert user["first_name"] == payload["first_name"]
-        assert "id" in user, "响应应包含用户 ID"
-        assert "created_at" in user, "响应应包含 created_at"
+        assert response.status_code == 201, f"期望201, 实际{response.status_code}"
+        u = response.json()
+        assert u["email"] == payload["email"]
+        assert u["first_name"] == payload["first_name"]
+        assert u["last_name"] == payload["last_name"]
+        assert "id" in u
+        assert "created_at" in u
 
-    # [API_USER_002] --------------------------------------------------
-    def test_register_duplicate_email_returns_409(
-        self, user_client: UserClient, registered_user: dict[str, Any]
-    ) -> None:
-        """重复邮箱注册 → 409 Conflict。"""
-        payload = dict(VALID_PAYLOAD)
-        payload["email"] = registered_user["email"]
-        response = user_client.post("/users/register", json=payload)
-        assert response.status_code == 409, f"期望409, 实际{response.status_code}"
+    # [API_USER_002]
+    def test_register_duplicate_email_409(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = registered_user["email"]
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 409, f"期望409, 实际{r.status_code}"
 
-    # [API_USER_003] --------------------------------------------------
-    def test_register_missing_password_returns_422(
-        self, user_client: UserClient
-    ) -> None:
-        """缺必填字段 password → 422。"""
-        payload = dict(VALID_PAYLOAD)
-        payload["email"] = generate_unique_email("nopass")
-        del payload["password"]
-        response = user_client.post("/users/register", json=payload)
-        assert response.status_code == 422, f"期望422, 实际{response.status_code}"
+    # [API_USER_003]
+    def test_missing_first_name_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("nofn"); del d["first_name"]
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
-    # [API_USER_004] --------------------------------------------------
-    def test_register_missing_first_name_returns_422(
-        self, user_client: UserClient
-    ) -> None:
-        """缺必填字段 first_name → 422。"""
-        payload = dict(VALID_PAYLOAD)
-        payload["email"] = generate_unique_email("nofn")
-        del payload["first_name"]
-        response = user_client.post("/users/register", json=payload)
-        assert response.status_code == 422, f"期望422, 实际{response.status_code}"
+    # [API_USER_004]
+    def test_missing_last_name_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("noln"); del d["last_name"]
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
-    # [API_USER_005] --------------------------------------------------
-    def test_register_weak_password_returns_422(
-        self, user_client: UserClient
-    ) -> None:
-        """密码不足 8 位 → 422。"""
-        payload = dict(VALID_PAYLOAD)
-        payload["email"] = generate_unique_email("weak")
-        payload["password"] = "Abc!1"  # 5 chars
-        response = user_client.post("/users/register", json=payload)
-        assert response.status_code == 422, f"期望422, 实际{response.status_code}"
+    # [API_USER_005]
+    def test_missing_email_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); del d["email"]
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
-    # [API_USER_006] --------------------------------------------------
-    def test_register_invalid_email_format_returns_422(
-        self, user_client: UserClient
-    ) -> None:
-        """邮箱格式非法 → 422（或 201，取决于服务端校验策略）。"""
-        payload = dict(VALID_PAYLOAD)
-        payload["email"] = f"bad-email-{uuid.uuid4().hex[:6]}"  # 缺少 @ 符号
-        response = user_client.post("/users/register", json=payload)
-        # 实际 API 对邮箱格式校验宽松，可能返回 201；409 说明之前已注册（幂等）
-        assert response.status_code in (201, 422, 409), f"意外状态码: {response.status_code}"
+    # [API_USER_006]
+    def test_missing_password_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("nopw"); del d["password"]
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
-    # [API_USER_007] --------------------------------------------------
-    def test_register_dob_out_of_range_returns_422(
-        self, user_client: UserClient
-    ) -> None:
-        """dob 不足 18 岁 → 422。"""
-        payload = dict(VALID_PAYLOAD)
-        payload["email"] = generate_unique_email("underage")
-        payload["dob"] = "2015-01-01"
-        response = user_client.post("/users/register", json=payload)
-        assert response.status_code == 422, f"期望422, 实际{response.status_code}"
+    # [API_USER_007]
+    def test_password_too_short_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("short"); d["password"] = "Ab1!"
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_008]
+    def test_password_no_uppercase_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("noupper"); d["password"] = "abcdef1!"
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_009]
+    def test_password_no_symbol_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("nosym"); d["password"] = "Abcdef12"
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_010]
+    def test_invalid_email_format(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = f"bad-email-{uuid.uuid4().hex[:6]}"
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code in (201, 422, 409), f"意外: {r.status_code}"
+
+    # [API_USER_011]
+    def test_dob_under_18_422(self, user_client: UserClient) -> None:
+        underage = (date.today().replace(year=date.today().year - 17)).isoformat()
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("u18"); d["dob"] = underage
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_012]
+    def test_dob_over_75(self, user_client: UserClient) -> None:
+        overage = (date.today().replace(year=date.today().year - 76)).isoformat()
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("o75"); d["dob"] = overage
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code in (201, 422), f"意外: {r.status_code}（API 可能不校验 dob 上限）"
+
+    # [API_USER_013]
+    def test_first_name_too_long_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("longfn"); d["first_name"] = "A" * 41
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_014]
+    def test_last_name_too_long_422(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("longln"); d["last_name"] = "B" * 21
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_015]
+    def test_email_too_long(self, user_client: UserClient) -> None:
+        long_email = f"{'a' * 248}@{uuid.uuid4().hex[:6]}.x"
+        d = dict(VALID_PAYLOAD); d["email"] = long_email; d["password"] = "Str0ng!Pass"
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code in (201, 422), f"意外: {r.status_code}（API 可能不校验 email 长度）"
+
+    # [API_USER_016]
+    def test_register_with_phone_201(self, user_client: UserClient) -> None:
+        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("phone"); d["phone"] = "+8613800138000"
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 201, f"期望201, 实际{r.status_code}"
+        assert r.json().get("phone") == "+8613800138000"
+
+    # [API_USER_017]
+    def test_empty_body_422(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/register", json={})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
 
 # ======================================================================
-# 登录（POST /users/login）── API_USER_008 ~ API_USER_011
+# 1.2 登录（6 条）── API_USER_018 ~ API_USER_023
 # ======================================================================
 
 class TestLogin:
-    """用户登录。"""
-
-    # [API_USER_008] --------------------------------------------------
-    def test_login_success(
-        self, user_client: UserClient, registered_user: dict[str, Any]
-    ) -> None:
-        """正确凭证登录 → 200，返回 access_token / token_type / expires_in。"""
-        response = user_client.post("/users/login", json={
-            "email": registered_user["email"],
-            "password": registered_user["password"],
-        })
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        data = response.json()
-        assert "access_token" in data, "响应应包含 access_token"
+    # [API_USER_018]
+    def test_login_success(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
+        r = user_client.post("/users/login", json={"email": registered_user["email"], "password": registered_user["password"]})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        data = r.json()
+        assert "access_token" in data
         assert data["token_type"] == "bearer"
         assert data["expires_in"] > 0
 
-    # [API_USER_009] --------------------------------------------------
-    def test_login_wrong_password_returns_401(
-        self, user_client: UserClient, registered_user: dict[str, Any]
-    ) -> None:
-        """错误密码登录 → 401。"""
-        response = user_client.post("/users/login", json={
-            "email": registered_user["email"],
-            "password": "WrongPassword!1",
-        })
-        assert response.status_code == 401, f"期望401, 实际{response.status_code}"
+    # [API_USER_019]
+    def test_wrong_password_401(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
+        r = user_client.post("/users/login", json={"email": registered_user["email"], "password": "WrongPass!1"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
-    # [API_USER_010] --------------------------------------------------
-    def test_login_nonexistent_email_returns_401(
-        self, user_client: UserClient
-    ) -> None:
-        """不存在邮箱登录 → 401。"""
-        response = user_client.post("/users/login", json={
-            "email": f"no-such-{uuid.uuid4().hex[:8]}@example.com",
-            "password": "Anything1!",
-        })
-        assert response.status_code == 401, f"期望401, 实际{response.status_code}"
+    # [API_USER_020]
+    def test_nonexistent_email_401(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/login", json={"email": f"no-{uuid.uuid4().hex[:8]}@x.com", "password": "Anything1!"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
-    # [API_USER_011] --------------------------------------------------
-    def test_login_missing_email_returns_401(
-        self, user_client: UserClient
-    ) -> None:
-        """登录缺少 email 字段 → 401。"""
-        response = user_client.post("/users/login", json={"password": "Anything1!"})
-        assert response.status_code == 401, f"期望401, 实际{response.status_code}"
+    # [API_USER_021]
+    def test_missing_email_401(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/login", json={"password": "Anything1!"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+
+    # [API_USER_022]
+    def test_missing_password_401(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/login", json={"email": "x@x.com"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+
+    # [API_USER_023]
+    def test_empty_body_401(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/login", json={})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
 
 # ======================================================================
-# 获取当前用户（GET /users/me）── API_USER_012 ~ API_USER_013
+# 1.3 获取当前用户（3 条）── API_USER_024 ~ API_USER_026
 # ======================================================================
 
 class TestGetMe:
-    """获取当前登录用户信息。"""
+    # [API_USER_024]
+    def test_get_me_authenticated(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        r = c.get("/users/me")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        u = r.json()
+        assert u["email"] == authenticated_user["email"]
+        assert u["first_name"] == authenticated_user["first_name"]
+        assert "id" in u and "address" in u and "dob" in u and "created_at" in u
 
-    # [API_USER_012] --------------------------------------------------
-    def test_get_me_authenticated(
-        self, authenticated_user: dict[str, Any]
-    ) -> None:
-        """已登录 → 200，响应含 email / first_name / id / address。"""
-        client: UserClient = authenticated_user["client"]
-        response = client.get("/users/me")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        user = response.json()
-        assert user["email"] == authenticated_user["email"]
-        assert user["first_name"] == authenticated_user["first_name"]
-        assert "id" in user
-        assert "address" in user
+    # [API_USER_025]
+    def test_get_me_unauthenticated_401(self, user_client: UserClient) -> None:
+        r = user_client.get("/users/me")
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
-    # [API_USER_013] --------------------------------------------------
-    def test_get_me_without_token_returns_401(
-        self, user_client: UserClient
-    ) -> None:
-        """未登录 → 401。"""
-        response = user_client.get("/users/me")
-        assert response.status_code == 401, f"期望401, 实际{response.status_code}"
+    # [API_USER_026]
+    def test_get_me_after_logout_401(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        c.get("/users/logout")
+        r = c.get("/users/me")
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
 
 # ======================================================================
-# 更新用户（PUT /users/{id}）── API_USER_014 ~ API_USER_015
-# ======================================================================
-
-class TestUpdateUser:
-    """用户信息更新。"""
-
-    # [API_USER_014] --------------------------------------------------
-    def test_update_user_success(
-        self, authenticated_user: dict[str, Any]
-    ) -> None:
-        """已登录用户更新信息 → 200，随后 GET /users/me 验证字段已变更。"""
-        client: UserClient = authenticated_user["client"]
-        user_id = authenticated_user["user_id"]
-        new_first_name = "Updated"
-        updated = {
-            "first_name": new_first_name,
-            "last_name": "User",
-            "email": authenticated_user["email"],
-            "password": authenticated_user["password"],
-            "address": {
-                "street": "Updated Street",
-                "city": "Updated City",
-                "country": "DE",
-                "postal_code": "54321",
-            },
-            "dob": "1990-01-01",
-        }
-        response = client.put(f"/users/{user_id}", json=updated)
-        assert response.status_code == 200, f"期望200, 实际{response.status_code} {response.text}"
-        assert response.json()["success"] is True, "更新应返回 success: true"
-
-        # 回读验证
-        me_resp = client.get("/users/me")
-        assert me_resp.status_code == 200
-        assert me_resp.json()["first_name"] == new_first_name, "first_name 应已更新"
-
-    # [API_USER_015] --------------------------------------------------
-    def test_update_user_without_token_returns_401(
-        self, user_client: UserClient, registered_user: dict[str, Any]
-    ) -> None:
-        """未登录更新用户 → 401。"""
-        response = user_client.put(
-            f"/users/{registered_user['user_id']}",
-            json={
-                "first_name": "Hacker", "last_name": "X",
-                "email": "x@x.com", "password": "Xxxx!1",
-            },
-        )
-        assert response.status_code == 401, f"期望401, 实际{response.status_code}"
-
-
-# ======================================================================
-# 查询用户（GET /users/{id}）── API_USER_016 ~ API_USER_017
+# 1.4 获取指定用户（3 条）── API_USER_027 ~ API_USER_029
 # ======================================================================
 
 class TestGetUser:
-    """获取指定用户。"""
+    # [API_USER_027]
+    def test_get_existing_user(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
+        r = user_client.get(f"/users/{registered_user['user_id']}")
+        assert r.status_code in (200, 401), f"意外: {r.status_code}"
 
-    # [API_USER_016] --------------------------------------------------
-    def test_get_existing_user(
-        self, user_client: UserClient, registered_user: dict[str, Any]
-    ) -> None:
-        """查询存在的用户 → 200（或 401 取决于认证要求）。"""
-        response = user_client.get(f"/users/{registered_user['user_id']}")
-        assert response.status_code in (200, 401), f"意外状态码: {response.status_code}"
+    # [API_USER_028]
+    def test_get_nonexistent_user_404(self, user_client: UserClient) -> None:
+        r = user_client.get("/users/nonexistent-id-99999")
+        assert r.status_code in (404, 401), f"意外: {r.status_code}"
 
-    # [API_USER_017] --------------------------------------------------
-    def test_get_nonexistent_user_returns_404(
-        self, user_client: UserClient
-    ) -> None:
-        """查询不存在的用户 → 404 或 401。"""
-        response = user_client.get("/users/nonexistent-id-99999")
-        assert response.status_code in (404, 401), f"意外状态码: {response.status_code}"
+    # [API_USER_029]
+    def test_special_char_user_id(self, user_client: UserClient) -> None:
+        r = user_client.get("/users/../../etc")
+        assert r.status_code == 404, f"意外: {r.status_code}"
 
 
 # ======================================================================
-# 用户列表与搜索 ── API_USER_018 ~ API_USER_019
+# 1.5 PUT 全量更新（4 条）── API_USER_030 ~ API_USER_033
 # ======================================================================
 
-class TestUserListAndSearch:
-    """用户列表与搜索。"""
+class TestPutUser:
+    # [API_USER_030]
+    def test_put_success(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        uid = authenticated_user["user_id"]
+        body = {"first_name": "Updated", "last_name": "User", "email": authenticated_user["email"],
+                "password": authenticated_user["password"], "address": {"street": "New St", "city": "New City", "country": "DE", "postal_code": "54321"}, "dob": "1990-01-01"}
+        r = c.put(f"/users/{uid}", json=body)
+        assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
+        assert r.json().get("success") is True
+        me = c.get("/users/me").json()
+        assert me["first_name"] == "Updated"
 
-    # [API_USER_018] --------------------------------------------------
-    def test_get_users_returns_200(self, user_client: UserClient) -> None:
-        """获取用户列表 → 200 或 401。"""
-        response = user_client.get("/users")
-        assert response.status_code in (200, 401), f"意外状态码: {response.status_code}"
+    # [API_USER_031]
+    def test_put_unauthenticated_401(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
+        r = user_client.put(f"/users/{registered_user['user_id']}", json={"first_name": "H", "last_name": "X", "email": "x@x.com", "password": "Xxxx!1"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
-    # [API_USER_019] --------------------------------------------------
-    def test_search_users_returns_200(self, user_client: UserClient) -> None:
-        """搜索用户 → 200 或 401。"""
-        response = user_client.get("/users/search", params={"q": "test"})
-        assert response.status_code in (200, 401), f"意外状态码: {response.status_code}"
+    # [API_USER_032]
+    def test_put_missing_address_422(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        r = c.put(f"/users/{authenticated_user['user_id']}", json={"first_name": "X", "last_name": "Y", "email": authenticated_user["email"], "password": authenticated_user["password"]})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_033]
+    def test_put_nonexistent_user(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        r = c.put("/users/nonexistent-id-99999", json={"first_name": "X", "last_name": "Y", "email": "x@x.com", "password": "Str0ng!Pass", "address": {"street": "S", "city": "C", "country": "DE", "postal_code": "12345"}, "dob": "1990-01-01"})
+        assert r.status_code in (403, 404, 422), f"意外: {r.status_code}"
 
 
 # ======================================================================
-# 忘记密码（POST /users/forgot-password）── API_USER_020 ~ API_USER_021
+# 1.6 PATCH 部分更新（3 条）── API_USER_034 ~ API_USER_036
+# ======================================================================
+
+class TestPatchUser:
+    # [API_USER_034]
+    def test_patch_single_field(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        uid = authenticated_user["user_id"]
+        r = c.patch(f"/users/{uid}", json={"first_name": "Patched"})
+        assert r.status_code in (200, 201, 204), f"意外: {r.status_code} {r.text}"
+        me = c.get("/users/me").json()
+        assert me["first_name"] == "Patched"
+        assert me["last_name"] == authenticated_user["last_name"]
+
+    # [API_USER_035]
+    def test_patch_unauthenticated_401(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
+        r = user_client.patch(f"/users/{registered_user['user_id']}", json={"first_name": "H"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+
+    # [API_USER_036]
+    def test_patch_nonexistent_user(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        r = c.patch("/users/nonexistent-id-99999", json={"first_name": "X"})
+        assert r.status_code in (403, 404, 422), f"意外: {r.status_code}"
+
+
+# ======================================================================
+# 1.7 DELETE 删除（3 条）── API_USER_037 ~ API_USER_039
+# ======================================================================
+
+class TestDeleteUser:
+    # [API_USER_037]
+    def test_delete_unauthenticated_401(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
+        r = user_client.delete(f"/users/{registered_user['user_id']}")
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+
+    # [API_USER_038]
+    def test_delete_nonexistent_user(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        r = c.delete("/users/nonexistent-id-99999")
+        assert r.status_code in (403, 404, 422), f"意外: {r.status_code}"
+
+    # [API_USER_039]
+    def test_delete_self(self, user_client: UserClient) -> None:
+        email = generate_unique_email("delme")
+        pw = "Str0ng!Pass"
+        _register(user_client, email, password=pw)
+        user_client.login(email, pw)
+        me = user_client.get("/users/me").json()
+        r = user_client.delete(f"/users/{me['id']}")
+        assert r.status_code in (200, 204, 403), f"意外: {r.status_code} {r.text}"
+        # 如果返回 403，说明 API 禁止删除本人；如果返回 204，则验证登录
+        if r.status_code in (200, 204):
+            user_client.clear_token()
+            r2 = user_client.post("/users/login", json={"email": email, "password": pw})
+            assert r2.status_code == 401, f"删除后登录应401, 实际{r2.status_code}"
+
+
+# ======================================================================
+# 1.8 用户列表（3 条）── API_USER_040 ~ API_USER_042
+# ======================================================================
+
+class TestUserList:
+    # [API_USER_040]
+    def test_list_default(self, user_client: UserClient) -> None:
+        r = user_client.get("/users")
+        assert r.status_code in (200, 401), f"意外: {r.status_code}"
+
+    # [API_USER_041]
+    def test_list_page_1(self, user_client: UserClient) -> None:
+        r = user_client.get("/users", params={"page": 1})
+        assert r.status_code in (200, 401), f"意外: {r.status_code}"
+
+    # [API_USER_042]
+    def test_list_page_0(self, user_client: UserClient) -> None:
+        r = user_client.get("/users", params={"page": 0})
+        assert r.status_code in (200, 400, 401), f"意外: {r.status_code}"
+
+
+# ======================================================================
+# 1.9 搜索用户（3 条）── API_USER_043 ~ API_USER_045
+# ======================================================================
+
+class TestSearchUsers:
+    # [API_USER_043]
+    def test_search_hit(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
+        prefix = registered_user["email"].split("@")[0][:5]
+        r = user_client.get("/users/search", params={"q": prefix})
+        assert r.status_code in (200, 401), f"意外: {r.status_code}"
+
+    # [API_USER_044]
+    def test_search_no_hit(self, user_client: UserClient) -> None:
+        r = user_client.get("/users/search", params={"q": "xyznonexistent999"})
+        assert r.status_code in (200, 401), f"意外: {r.status_code}"
+
+    # [API_USER_045]
+    def test_search_special_chars(self, user_client: UserClient) -> None:
+        r = user_client.get("/users/search", params={"q": "<script>"})
+        assert r.status_code in (200, 401), f"意外: {r.status_code}"
+
+
+# ======================================================================
+# 1.10 忘记密码（2 条）── API_USER_046 ~ API_USER_047
 # ======================================================================
 
 class TestForgotPassword:
-    """忘记密码。"""
+    # [API_USER_046]
+    def test_valid_email(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/forgot-password", json={"email": "user@example.com"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
-    # [API_USER_020] --------------------------------------------------
-    def test_forgot_password_valid_email(self, user_client: UserClient) -> None:
-        """有效邮箱 → 422（端点需要额外验证参数）。"""
-        response = user_client.post(
-            "/users/forgot-password",
-            json={"email": "someone@example.com"},
-        )
-        assert response.status_code == 422, f"期望422, 实际{response.status_code}"
-
-    # [API_USER_021] --------------------------------------------------
-    def test_forgot_password_missing_email_returns_404(
-        self, user_client: UserClient
-    ) -> None:
-        """缺少 email → 404。"""
-        response = user_client.post("/users/forgot-password", json={})
-        assert response.status_code == 404, f"期望404, 实际{response.status_code}"
+    # [API_USER_047]
+    def test_missing_email_404(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/forgot-password", json={})
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
 
 
 # ======================================================================
-# 登出与 Token 刷新 ── API_USER_022 ~ API_USER_023
+# 1.11 修改密码（5 条）── API_USER_048 ~ API_USER_052
 # ======================================================================
 
-class TestLogoutAndRefresh:
-    """登出与 Token 刷新。"""
+class TestChangePassword:
+    @pytest.fixture
+    def authed(self, user_client: UserClient) -> dict[str, Any]:
+        email = generate_unique_email("chpw")
+        pw = "Str0ng!Old1"
+        _register(user_client, email, password=pw)
+        user_client.login(email, pw)
+        me = user_client.get("/users/me").json()
+        return {"client": user_client, "email": email, "old_pw": pw, "user_id": me["id"]}
 
-    # [API_USER_022] --------------------------------------------------
-    def test_logout_then_me_returns_401(
-        self, authenticated_user: dict[str, Any]
-    ) -> None:
-        """登出 → 200，随后 GET /users/me 应返回 401。"""
-        client: UserClient = authenticated_user["client"]
-        resp = client.get("/users/logout")
-        assert resp.status_code == 200, f"期望200, 实际{resp.status_code}"
+    # [API_USER_048]
+    def test_change_password_success(self, authed: dict[str, Any]) -> None:
+        c: UserClient = authed["client"]
+        r = c.post("/users/change-password", json={"current_password": authed["old_pw"], "new_password": "NewStr0ng!1", "new_password_confirmation": "NewStr0ng!1"})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
+        c.logout()
+        r2 = c.post("/users/login", json={"email": authed["email"], "password": "NewStr0ng!1"})
+        assert r2.status_code == 200, f"新密码应可登录, 实际{r2.status_code}"
 
-        me_resp = client.get("/users/me")
-        assert me_resp.status_code == 401, f"登出后期望401, 实际{me_resp.status_code}"
+    # [API_USER_049]
+    def test_wrong_current_password(self, authed: dict[str, Any]) -> None:
+        c: UserClient = authed["client"]
+        r = c.post("/users/change-password", json={"current_password": "WrongOld!1", "new_password": "NewStr0ng!1", "new_password_confirmation": "NewStr0ng!1"})
+        assert r.status_code in (400, 422), f"意外: {r.status_code}"
 
-    # [API_USER_023] --------------------------------------------------
-    def test_refresh_token(self, authenticated_user: dict[str, Any]) -> None:
-        """刷新 Token → 200，返回新的 access_token。"""
-        client: UserClient = authenticated_user["client"]
-        response = client.get("/users/refresh")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        data = response.json()
-        assert "access_token" in data, "刷新后应返回 access_token"
+    # [API_USER_050]
+    def test_mismatch_confirmation_422(self, authed: dict[str, Any]) -> None:
+        c: UserClient = authed["client"]
+        r = c.post("/users/change-password", json={"current_password": authed["old_pw"], "new_password": "NewStr0ng!1", "new_password_confirmation": "Different!1"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_051]
+    def test_weak_new_password_422(self, authed: dict[str, Any]) -> None:
+        c: UserClient = authed["client"]
+        r = c.post("/users/change-password", json={"current_password": authed["old_pw"], "new_password": "Ab1!", "new_password_confirmation": "Ab1!"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_052]
+    def test_unauthenticated_401(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/change-password", json={"current_password": "x", "new_password": "Str0ng!New1", "new_password_confirmation": "Str0ng!New1"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+
+
+# ======================================================================
+# 1.12 登出（2 条）── API_USER_053 ~ API_USER_054
+# ======================================================================
+
+class TestLogout:
+    # [API_USER_053]
+    def test_logout_authenticated(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        r = c.get("/users/logout")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        r2 = c.get("/users/me")
+        assert r2.status_code == 401, f"登出后 /me 应401, 实际{r2.status_code}"
+
+    # [API_USER_054]
+    def test_logout_unauthenticated(self, user_client: UserClient) -> None:
+        r = user_client.get("/users/logout")
+        assert r.status_code in (200, 401), f"意外: {r.status_code}"
+
+
+# ======================================================================
+# 1.13 Token 刷新（2 条）── API_USER_055 ~ API_USER_056
+# ======================================================================
+
+class TestRefreshToken:
+    # [API_USER_055]
+    def test_refresh_success(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        r = c.get("/users/refresh")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        assert "access_token" in r.json()
+
+    # [API_USER_056]
+    def test_refresh_unauthenticated(self, user_client: UserClient) -> None:
+        r = user_client.get("/users/refresh")
+        assert r.status_code in (401, 500), f"意外: {r.status_code}"
 
 # AI-assisted

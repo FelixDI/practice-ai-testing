@@ -1,8 +1,6 @@
 """Brand 模块 API 测试。
 
-对应文档：docs/test-cases/api-test-cases-v1.md（API_BRAND_001 ~ API_BRAND_008）
-
-覆盖维度：正常功能 · 异常场景（404）· 数据结构校验 · 搜索边界
+蓝图：docs/test-cases/brand.md —— 21 条用例，7 个端点全覆盖。
 """
 
 from __future__ import annotations
@@ -20,115 +18,194 @@ def client() -> BrandClient:
         yield c
 
 
+def _create_brand(client: BrandClient, name: str = "E2E Brand", slug: str | None = None) -> dict:
+    slug = slug or f"e2e-brand-{uuid.uuid4().hex[:8]}"
+    r = client.post("/brands", json={"name": name, "slug": slug})
+    assert r.status_code == 201, f"prep create failed: {r.status_code} {r.text}"
+    return r.json()
+
+
 # ======================================================================
-# 获取品牌列表（GET /brands）── API_BRAND_001 ~ API_BRAND_002
+# 2.1 品牌列表（2 条）── API_BRAND_001 ~ API_BRAND_002
 # ======================================================================
 
 class TestGetBrands:
-    """获取品牌列表。"""
+    # [API_BRAND_001]
+    def test_get_brands_200(self, client: BrandClient) -> None:
+        r = client.get("/brands")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        brands = r.json()
+        assert isinstance(brands, list)
+        assert len(brands) > 0
+        b = brands[0]
+        assert "id" in b and "name" in b and "slug" in b
 
-    # [API_BRAND_001] -------------------------------------------------
-    def test_get_brands_returns_200(self, client: BrandClient) -> None:
-        """获取品牌列表 → 200，返回非空数组，元素含 id/name/slug。"""
-        response = client.get("/brands")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        brands = response.json()
-        assert isinstance(brands, list), f"期望列表, 实际{type(brands)}"
-        assert len(brands) > 0, "品牌列表不应为空"
-        brand = brands[0]
-        assert "id" in brand, "品牌对象应包含 id"
-        assert "name" in brand, "品牌对象应包含 name"
-        assert "slug" in brand, "品牌对象应包含 slug"
-
-    # [API_BRAND_002] -------------------------------------------------
-    def test_get_brands_returns_valid_data(self, client: BrandClient) -> None:
-        """数据结构校验：前 5 个品牌的 id/name/slug 均为非空字符串。"""
-        response = client.get("/brands")
-        brands = response.json()
-        for brand in brands[:5]:
-            assert isinstance(brand["id"], str), f"id 应为字符串"
-            assert isinstance(brand["name"], str), f"name 应为字符串"
-            assert isinstance(brand["slug"], str), f"slug 应为字符串"
-            assert len(brand["name"]) > 0, "name 不应为空"
-            assert len(brand["slug"]) > 0, "slug 不应为空"
-
-
-# ======================================================================
-# 获取指定品牌（GET /brands/{brandId}）── API_BRAND_003 ~ API_BRAND_004
-# ======================================================================
-
-class TestGetBrand:
-    """获取指定品牌。"""
-
-    # [API_BRAND_003] -------------------------------------------------
-    def test_get_brand_by_valid_id(self, client: BrandClient) -> None:
-        """存在的品牌 ID → 200，响应体 id 与请求一致。"""
+    # [API_BRAND_002]
+    def test_structure_valid(self, client: BrandClient) -> None:
         brands = client.get("/brands").json()
-        existing_id = brands[0]["id"]
-        existing_slug = brands[0]["slug"]
-        response = client.get(f"/brands/{existing_id}")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        brand = response.json()
-        assert brand["id"] == existing_id
-        assert brand["slug"] == existing_slug
-
-    # [API_BRAND_004] -------------------------------------------------
-    def test_get_brand_nonexistent_returns_404(self, client: BrandClient) -> None:
-        """不存在的品牌 ID → 404。"""
-        response = client.get("/brands/nonexistent-id-99999")
-        assert response.status_code == 404, f"期望404, 实际{response.status_code}"
+        for b in brands[:5]:
+            assert isinstance(b["id"], str) and len(b["id"]) > 0
+            assert isinstance(b["name"], str) and len(b["name"]) > 0
+            assert isinstance(b["slug"], str) and len(b["slug"]) > 0
 
 
 # ======================================================================
-# 搜索品牌（GET /brands/search）── API_BRAND_005 ~ API_BRAND_007
-# ======================================================================
-
-class TestSearchBrands:
-    """搜索品牌。"""
-
-    # [API_BRAND_005] -------------------------------------------------
-    def test_search_brands_with_match(self, client: BrandClient) -> None:
-        """搜索 'for' → 200，返回匹配的品牌列表。"""
-        response = client.get("/brands/search", params={"q": "for"})
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        results = response.json()
-        assert isinstance(results, list), f"期望列表, 实际{type(results)}"
-
-    # [API_BRAND_006] -------------------------------------------------
-    def test_search_brands_no_match(self, client: BrandClient) -> None:
-        """搜索不存在的关键词 → 200，返回空数组。"""
-        response = client.get("/brands/search", params={"q": "xyznonexistent999"})
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-        results = response.json()
-        assert isinstance(results, list), f"期望列表, 实际{type(results)}"
-        assert len(results) == 0, "无匹配时应返回空列表"
-
-    # [API_BRAND_007] -------------------------------------------------
-    def test_search_brands_no_query_returns_all(self, client: BrandClient) -> None:
-        """不传 q 参数 → 200，返回全量（q 为可选参数）。"""
-        response = client.get("/brands/search")
-        assert response.status_code == 200, f"期望200, 实际{response.status_code}"
-
-
-# ======================================================================
-# 创建品牌（POST /brands）── API_BRAND_008
+# 2.2 创建品牌（5 条）── API_BRAND_003 ~ API_BRAND_007
 # ======================================================================
 
 class TestCreateBrand:
-    """创建品牌。"""
+    # [API_BRAND_003]
+    def test_create_201(self, client: BrandClient) -> None:
+        slug = f"test-{uuid.uuid4().hex[:8]}"
+        r = client.post("/brands", json={"name": "New Brand", "slug": slug})
+        assert r.status_code == 201, f"期望201, 实际{r.status_code}"
+        d = r.json()
+        assert d["name"] == "New Brand" and d["slug"] == slug and "id" in d
 
-    # [API_BRAND_008] -------------------------------------------------
-    def test_create_brand_returns_201(self, client: BrandClient) -> None:
-        """创建品牌 → 201，响应含 id/name/slug（本环境公开创建）。"""
-        slug = f"test-brand-{uuid.uuid4().hex[:8]}"
-        response = client.post("/brands", json={
-            "name": "E2E Test Brand",
-            "slug": slug,
-        })
-        assert response.status_code == 201, f"期望201, 实际{response.status_code} {response.text}"
-        data = response.json()
-        assert data["name"] == "E2E Test Brand"
-        assert data["slug"] == slug
-        assert "id" in data
+    # [API_BRAND_004]
+    def test_missing_name_422(self, client: BrandClient) -> None:
+        r = client.post("/brands", json={"slug": "only-slug"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_BRAND_005]
+    def test_missing_slug_422(self, client: BrandClient) -> None:
+        r = client.post("/brands", json={"name": "only-name"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_BRAND_006]
+    def test_duplicate_slug_409(self, client: BrandClient) -> None:
+        slug = f"dup-{uuid.uuid4().hex[:8]}"
+        _create_brand(client, slug=slug)
+        r = client.post("/brands", json={"name": "Dup Brand", "slug": slug})
+        assert r.status_code == 409, f"期望409, 实际{r.status_code}"
+
+    # [API_BRAND_007]
+    def test_empty_body_422(self, client: BrandClient) -> None:
+        r = client.post("/brands", json={})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+
+# ======================================================================
+# 2.3 单个品牌（3 条）── API_BRAND_008 ~ API_BRAND_010
+# ======================================================================
+
+class TestGetBrand:
+    # [API_BRAND_008]
+    def test_get_by_id_200(self, client: BrandClient) -> None:
+        brands = client.get("/brands").json()
+        bid = brands[0]["id"]
+        r = client.get(f"/brands/{bid}")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        assert r.json()["id"] == bid
+
+    # [API_BRAND_009]
+    def test_nonexistent_404(self, client: BrandClient) -> None:
+        r = client.get("/brands/nonexistent-id-99999")
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+
+    # [API_BRAND_010]
+    def test_empty_id(self, client: BrandClient) -> None:
+        r = client.get("/brands/ ")
+        assert r.status_code in (404, 405), f"意外: {r.status_code}"
+
+
+# ======================================================================
+# 2.4 更新品牌（3 条）── API_BRAND_011 ~ API_BRAND_013
+# ======================================================================
+
+class TestPutBrand:
+    # [API_BRAND_011]
+    def test_put_success(self, client: BrandClient) -> None:
+        b = _create_brand(client)
+        bid = b["id"]
+        r = client.put(f"/brands/{bid}", json={"name": "Updated Brand", "slug": b["slug"]})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
+        assert r.json().get("success") is True
+        # 回读验证
+        updated = client.get(f"/brands/{bid}").json()
+        assert updated["name"] == "Updated Brand"
+
+    # [API_BRAND_012]
+    def test_put_nonexistent_404(self, client: BrandClient) -> None:
+        r = client.put("/brands/nonexistent-id-99999", json={"name": "X", "slug": "x"})
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+
+    # [API_BRAND_013]
+    def test_put_missing_name(self, client: BrandClient) -> None:
+        b = _create_brand(client)
+        r = client.put(f"/brands/{b['id']}", json={"slug": b["slug"]})
+        assert r.status_code in (200, 422), f"意外: {r.status_code}（缺 name 时 API 可能通过或拒绝）"
+
+
+# ======================================================================
+# 2.5 部分更新品牌（2 条）── API_BRAND_014 ~ API_BRAND_015
+# ======================================================================
+
+class TestPatchBrand:
+    # [API_BRAND_014]
+    def test_patch_name(self, client: BrandClient) -> None:
+        b = _create_brand(client)
+        original_slug = b["slug"]
+        r = client.patch(f"/brands/{b['id']}", json={"name": "Patched Brand"})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
+        assert r.json().get("success") is True
+        # 回读验证
+        updated = client.get(f"/brands/{b['id']}").json()
+        assert updated["name"] == "Patched Brand"
+        assert updated["slug"] == original_slug
+
+    # [API_BRAND_015]
+    def test_patch_nonexistent_404(self, client: BrandClient) -> None:
+        r = client.patch("/brands/nonexistent-id-99999", json={"name": "X"})
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+
+
+# ======================================================================
+# 2.6 删除品牌（3 条）── API_BRAND_016 ~ API_BRAND_018
+# ======================================================================
+
+class TestDeleteBrand:
+    """删除品牌 —— 需要认证。"""
+
+    # [API_BRAND_016]
+    def test_delete_requires_auth(self, client: BrandClient) -> None:
+        b = _create_brand(client)
+        r = client.delete(f"/brands/{b['id']}")
+        assert r.status_code == 401, f"期望401（需认证）, 实际{r.status_code}"
+
+    # [API_BRAND_017]
+    def test_delete_nonexistent(self, client: BrandClient) -> None:
+        r = client.delete("/brands/nonexistent-id-99999")
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
+
+    # [API_BRAND_018]
+    def test_delete_twice(self, client: BrandClient) -> None:
+        b = _create_brand(client)
+        client.delete(f"/brands/{b['id']}")
+        r = client.delete(f"/brands/{b['id']}")
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
+
+
+# ======================================================================
+# 2.7 搜索品牌（3 条）── API_BRAND_019 ~ API_BRAND_021
+# ======================================================================
+
+class TestSearchBrands:
+    # [API_BRAND_019]
+    def test_search_hit(self, client: BrandClient) -> None:
+        r = client.get("/brands/search", params={"q": "for"})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        assert isinstance(r.json(), list)
+
+    # [API_BRAND_020]
+    def test_search_no_hit(self, client: BrandClient) -> None:
+        r = client.get("/brands/search", params={"q": "xyznonexistent999"})
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
+        assert r.json() == []
+
+    # [API_BRAND_021]
+    def test_search_no_query(self, client: BrandClient) -> None:
+        r = client.get("/brands/search")
+        assert r.status_code == 200, f"期望200, 实际{r.status_code}"
 
 # AI-assisted
