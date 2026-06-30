@@ -17,15 +17,33 @@ practice-ai-testing/
 │   ├── test-cases/
 │   └── practice_software_testing_api.json
 ├── src/
+│   ├── api/
+│   │   ├── client/
+│   │   │   └── __init__.py
+│   │   └── __init__.py
+│   ├── common/
+│   │   └── __init__.py
+│   ├── ui/
+│   │   ├── pages/
+│   │   │   └── __init__.py
+│   │   └── __init__.py
+│   └── __init__.py
 ├── tests/
 │   ├── api/
-│   └── ui/
+│   │   └── __init__.py
+│   ├── integration/
+│   │   └── __init__.py
+│   ├── ui/
+│   │   └── __init__.py
+│   ├── __init__.py
+│   └── conftest.py
+├── CLAUDE.md
 ├── README.md
 ├── main.py
 ├── pyproject.toml
 ├── update_tree.py
 └── uv.lock
 
-7 directories, 6 files
+13 directories, 18 files
 ```
 <!-- PROJECT_STRUCTURE_END -->
