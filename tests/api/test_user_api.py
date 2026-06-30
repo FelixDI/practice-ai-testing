@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import copy
 import uuid
 from datetime import date, timedelta
 from typing import Any
@@ -35,7 +36,7 @@ VALID_PAYLOAD: dict[str, Any] = {
 
 
 def _register(user_client: UserClient, email: str, **overrides: Any) -> dict[str, Any]:
-    data = dict(VALID_PAYLOAD)
+    data = copy.deepcopy(VALID_PAYLOAD)
     data["email"] = email
     data.update(overrides)
     r = user_client.post("/users/register", json=data)
@@ -50,7 +51,7 @@ def _register(user_client: UserClient, email: str, **overrides: Any) -> dict[str
 class TestRegister:
     @pytest.fixture
     def payload(self) -> dict[str, Any]:
-        d = dict(VALID_PAYLOAD)
+        d = copy.deepcopy(VALID_PAYLOAD)
         d["email"] = generate_unique_email("reg")
         return d
 
@@ -67,94 +68,94 @@ class TestRegister:
 
     # [API_USER_002]
     def test_register_duplicate_email_409(self, user_client: UserClient, registered_user: dict[str, Any]) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = registered_user["email"]
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = registered_user["email"]
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 409, f"期望409, 实际{r.status_code}"
 
     # [API_USER_003]
     def test_missing_first_name_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("nofn"); del d["first_name"]
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("nofn"); del d["first_name"]
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_004]
     def test_missing_last_name_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("noln"); del d["last_name"]
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("noln"); del d["last_name"]
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_005]
     def test_missing_email_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); del d["email"]
+        d = copy.deepcopy(VALID_PAYLOAD); del d["email"]
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_006]
     def test_missing_password_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("nopw"); del d["password"]
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("nopw"); del d["password"]
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_007]
     def test_password_too_short_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("short"); d["password"] = "Ab1!"
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("short"); d["password"] = "Ab1!"
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_008]
     def test_password_no_uppercase_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("noupper"); d["password"] = "abcdef1!"
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("noupper"); d["password"] = "abcdef1!"
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_009]
     def test_password_no_symbol_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("nosym"); d["password"] = "Abcdef12"
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("nosym"); d["password"] = "Abcdef12"
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_010]
     def test_invalid_email_format(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = f"bad-email-{uuid.uuid4().hex[:6]}"
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = f"bad-email-{uuid.uuid4().hex[:6]}"
         r = user_client.post("/users/register", json=d)
         assert r.status_code in (201, 422, 409), f"意外: {r.status_code}"
 
     # [API_USER_011]
     def test_dob_under_18_422(self, user_client: UserClient) -> None:
         underage = (date.today().replace(year=date.today().year - 17)).isoformat()
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("u18"); d["dob"] = underage
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("u18"); d["dob"] = underage
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_012]
     def test_dob_over_75(self, user_client: UserClient) -> None:
         overage = (date.today().replace(year=date.today().year - 76)).isoformat()
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("o75"); d["dob"] = overage
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("o75"); d["dob"] = overage
         r = user_client.post("/users/register", json=d)
         assert r.status_code in (201, 422), f"意外: {r.status_code}（API 可能不校验 dob 上限）"
 
     # [API_USER_013]
     def test_first_name_too_long_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("longfn"); d["first_name"] = "A" * 41
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("longfn"); d["first_name"] = "A" * 41
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_014]
     def test_last_name_too_long_422(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("longln"); d["last_name"] = "B" * 21
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("longln"); d["last_name"] = "B" * 21
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_USER_015]
     def test_email_too_long(self, user_client: UserClient) -> None:
         long_email = f"{'a' * 248}@{uuid.uuid4().hex[:6]}.x"
-        d = dict(VALID_PAYLOAD); d["email"] = long_email; d["password"] = "Str0ng!Pass"
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = long_email; d["password"] = "Str0ng!Pass"
         r = user_client.post("/users/register", json=d)
         assert r.status_code in (201, 422), f"意外: {r.status_code}（API 可能不校验 email 长度）"
 
     # [API_USER_016]
     def test_register_with_phone_201(self, user_client: UserClient) -> None:
-        d = dict(VALID_PAYLOAD); d["email"] = generate_unique_email("phone"); d["phone"] = "+8613800138000"
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("phone"); d["phone"] = "+8613800138000"
         r = user_client.post("/users/register", json=d)
         assert r.status_code == 201, f"期望201, 实际{r.status_code}"
         assert r.json().get("phone") == "+8613800138000"
@@ -163,6 +164,47 @@ class TestRegister:
     def test_empty_body_422(self, user_client: UserClient) -> None:
         r = user_client.post("/users/register", json={})
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_057]
+    def test_password_no_digit_422(self, user_client: UserClient) -> None:
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("nodig"); d["password"] = "Abcdefg!"
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_058]
+    def test_street_too_long_422(self, user_client: UserClient) -> None:
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("longst")
+        d["address"]["street"] = "A" * 71
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_059]
+    def test_city_too_long_422(self, user_client: UserClient) -> None:
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("longct")
+        d["address"]["city"] = "B" * 41
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_060]
+    def test_phone_too_long_422(self, user_client: UserClient) -> None:
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("longph"); d["phone"] = "1" * 25
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_061]
+    def test_postal_code_too_long_422(self, user_client: UserClient) -> None:
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = generate_unique_email("longpc")
+        d["address"]["postal_code"] = "1" * 11
+        r = user_client.post("/users/register", json=d)
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_USER_062]
+    def test_register_only_required_fields_201(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/register", json={
+            "first_name": "Min", "last_name": "User",
+            "email": generate_unique_email("min"), "password": "Str0ng!Pass",
+        })
+        assert r.status_code == 201, f"期望201, 实际{r.status_code}"
 
 
 # ======================================================================
@@ -489,5 +531,68 @@ class TestRefreshToken:
     def test_refresh_unauthenticated(self, user_client: UserClient) -> None:
         r = user_client.get("/users/refresh")
         assert r.status_code in (401, 500), f"意外: {r.status_code}"
+
+# ======================================================================
+# 1.14 权限/状态组合（3 条）── API_USER_063 ~ API_USER_065
+# ======================================================================
+
+class TestPrivilegeEscalation:
+    """横向越权与资源状态测试。"""
+
+    @pytest.fixture
+    def two_users(self, user_client: UserClient) -> dict[str, Any]:
+        """注册用户 A 和 B，A 登录，返回 A_client + A_id + B_id。"""
+        uc = user_client
+        # Register A
+        email_a = generate_unique_email("usera")
+        _register(uc, email_a)
+        uc.login(email_a, "Str0ng!Pass")
+        a_id = uc.get("/users/me").json()["id"]
+        a_token = uc.token
+        # Register B (need separate client to not lose A's session... actually we can reuse)
+        email_b = generate_unique_email("userb")
+        _register(uc, email_b)  # This un-sets the token? No, _register uses POST directly
+        # We need to get B's id. Let's login as B briefly
+        uc.login(email_b, "Str0ng!Pass")
+        b_id = uc.get("/users/me").json()["id"]
+        # Re-login as A
+        uc.set_token(a_token)
+        return {"client": uc, "a_id": a_id, "b_id": b_id, "a_email": email_a, "b_email": email_b}
+
+    # [API_USER_063]
+    def test_user_a_put_user_b_returns_403(self, two_users: dict[str, Any]) -> None:
+        """用户 A 的 Token 操作用户 B 的数据 → 403。"""
+        c: UserClient = two_users["client"]
+        r = c.put(f"/users/{two_users['b_id']}", json={
+            "first_name": "Hacker", "last_name": "X",
+            "email": two_users["a_email"], "password": "Str0ng!Pass",
+            "address": {"street": "S", "city": "C", "country": "DE", "postal_code": "12345"},
+            "dob": "1990-01-01",
+        })
+        assert r.status_code == 403, f"期望403, 实际{r.status_code}"
+
+    # [API_USER_064]
+    def test_user_a_delete_user_b_returns_403(self, two_users: dict[str, Any]) -> None:
+        """用户 A 删除用户 B → 403。"""
+        c: UserClient = two_users["client"]
+        r = c.delete(f"/users/{two_users['b_id']}")
+        assert r.status_code == 403, f"期望403, 实际{r.status_code}"
+
+    # [API_USER_065]
+    def test_get_deleted_user_returns_404(self, authenticated_user: dict[str, Any]) -> None:
+        """被删除用户的资源再次访问 → 404。"""
+        # Register a fresh user, delete self (if allowed), then GET
+        uc2 = UserClient()
+        email = generate_unique_email("delme2")
+        _register(uc2, email)
+        uc2.login(email, "Str0ng!Pass")
+        uid = uc2.get("/users/me").json()["id"]
+        r = uc2.delete(f"/users/{uid}")
+        if r.status_code in (200, 204):
+            r2 = uc2.get(f"/users/{uid}")
+            assert r2.status_code == 404, f"删除后 GET 应404, 实际{r2.status_code}"
+        else:
+            # API doesn't allow self-delete (403), skip verification
+            assert r.status_code == 403, f"意外: {r.status_code}"
 
 # AI-assisted

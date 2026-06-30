@@ -208,4 +208,56 @@ class TestSearchBrands:
         r = client.get("/brands/search")
         assert r.status_code == 200, f"期望200, 实际{r.status_code}"
 
+# ======================================================================
+# 2.8 边界补充（4 条）── API_BRAND_022 ~ API_BRAND_025
+# ======================================================================
+
+class TestBrandBoundary:
+    # [API_BRAND_022]
+    def test_slug_with_spaces_422(self, client: BrandClient) -> None:
+        r = client.post("/brands", json={"name": "Space Brand", "slug": "slug with spaces"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_BRAND_023]
+    def test_slug_special_chars_422(self, client: BrandClient) -> None:
+        r = client.post("/brands", json={"name": "Special Brand", "slug": "slug@#$"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_BRAND_024]
+    def test_name_empty_string_422(self, client: BrandClient) -> None:
+        r = client.post("/brands", json={"name": "", "slug": f"empty-name-{uuid.uuid4().hex[:8]}"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_BRAND_025]
+    def test_slug_empty_string_422(self, client: BrandClient) -> None:
+        r = client.post("/brands", json={"name": "Empty Slug Brand", "slug": ""})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+
+# ======================================================================
+# 2.9 权限/状态组合（3 条）── API_BRAND_026 ~ API_BRAND_028
+# ======================================================================
+
+class TestBrandAuth:
+    # [API_BRAND_026]
+    def test_put_slug_conflict_409(self, client: BrandClient) -> None:
+        slug_a = f"conflict-a-{uuid.uuid4().hex[:8]}"
+        slug_b = f"conflict-b-{uuid.uuid4().hex[:8]}"
+        _create_brand(client, name="Brand A", slug=slug_a)
+        b = _create_brand(client, name="Brand B", slug=slug_b)
+        r = client.put(f"/brands/{b['id']}", json={"name": "Brand A", "slug": slug_a})
+        assert r.status_code == 409, f"期望409, 实际{r.status_code}"
+
+    # [API_BRAND_027]
+    def test_put_unauthenticated_401(self) -> None:
+        bc = BrandClient()
+        r = bc.put("/brands/some-id", json={"name": "X", "slug": "x"})
+        assert r.status_code in (401, 404), f"意外: {r.status_code}（不存在路由可能返回404先于401）"
+
+    # [API_BRAND_028]
+    def test_patch_unauthenticated_401(self) -> None:
+        bc = BrandClient()
+        r = bc.patch("/brands/some-id", json={"name": "X"})
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
+
 # AI-assisted

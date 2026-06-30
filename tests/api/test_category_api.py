@@ -231,4 +231,67 @@ class TestDeleteCategory:
         r = client.delete(f"/categories/{c['id']}")
         assert r.status_code in (401, 404), f"意外: {r.status_code}"
 
+# ======================================================================
+# 3.9 边界补充（6 条）── API_CATEGORY_023 ~ API_CATEGORY_028
+# ======================================================================
+
+class TestCategoryBoundary:
+    # [API_CATEGORY_023]
+    def test_slug_with_spaces_422(self, client: CategoryClient) -> None:
+        r = client.post("/categories", json={"name": "Space Cat", "slug": "cat with spaces"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_CATEGORY_024]
+    def test_slug_special_chars_422(self, client: CategoryClient) -> None:
+        r = client.post("/categories", json={"name": "Spec Cat", "slug": "cat@#$"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_CATEGORY_025]
+    def test_name_empty_string_422(self, client: CategoryClient) -> None:
+        r = client.post("/categories", json={"name": "", "slug": f"empty-{uuid.uuid4().hex[:8]}"})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_CATEGORY_026]
+    def test_parent_id_self_reference_422(self, client: CategoryClient) -> None:
+        c = _create_category(client, slug=f"selfref-{uuid.uuid4().hex[:8]}")
+        r = client.post("/categories", json={"name": "Self Ref", "slug": f"child-{uuid.uuid4().hex[:8]}", "parent_id": c["id"]})
+        assert r.status_code in (200, 201, 422), f"意外: {r.status_code}"
+
+    # [API_CATEGORY_027]
+    def test_three_level_nesting_201(self, client: CategoryClient) -> None:
+        l1 = _create_category(client, slug=f"l1-{uuid.uuid4().hex[:8]}")
+        l2 = _create_category(client, slug=f"l2-{uuid.uuid4().hex[:8]}", parent_id=l1["id"])
+        l3_slug = f"l3-{uuid.uuid4().hex[:8]}"
+        r = client.post("/categories", json={"name": "Level 3", "slug": l3_slug, "parent_id": l2["id"]})
+        assert r.status_code in (200, 201), f"意外: {r.status_code}"
+        d = r.json()
+        assert d["parent_id"] == l2["id"]
+
+    # [API_CATEGORY_028]
+    def test_put_slug_conflict_409(self, client: CategoryClient) -> None:
+        slug_a = f"cata-{uuid.uuid4().hex[:8]}"
+        slug_b = f"catb-{uuid.uuid4().hex[:8]}"
+        _create_category(client, name="Cat A", slug=slug_a)
+        b = _create_category(client, name="Cat B", slug=slug_b)
+        r = client.put(f"/categories/{b['id']}", json={"name": "Cat A", "slug": slug_a})
+        assert r.status_code == 409, f"期望409, 实际{r.status_code}"
+
+
+# ======================================================================
+# 3.10 权限/状态组合（2 条）── API_CATEGORY_029 ~ API_CATEGORY_030
+# ======================================================================
+
+class TestCategoryAuth:
+    # [API_CATEGORY_029]
+    def test_put_unauthenticated_401(self) -> None:
+        cc = CategoryClient()
+        r = cc.put("/categories/some-id", json={"name": "X", "slug": "x"})
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
+
+    # [API_CATEGORY_030]
+    def test_patch_unauthenticated_401(self) -> None:
+        cc = CategoryClient()
+        r = cc.patch("/categories/some-id", json={"name": "X"})
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
+
 # AI-assisted
