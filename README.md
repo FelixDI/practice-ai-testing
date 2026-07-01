@@ -1,5 +1,6 @@
 # practice-ai-testing
 
+Toolshop 电商系统
 基于 Claude Code + DeepSeek V4 Pro 的 AI 协作自动化测试项目
 
 被测对象：Practice Software Testing
@@ -92,3 +93,8 @@ practice-ai-testing/
 13 directories, 63 files
 ```
 <!-- PROJECT_STRUCTURE_END -->
+
+
+
+#### API test:
+[Allure测试报告](https://felixdi.github.io/practice-ai-testing/api-allure-report/)
