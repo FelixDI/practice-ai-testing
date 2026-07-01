@@ -18,8 +18,12 @@ from src.api.client.brand_client import BrandClient
 from src.api.client.category_client import CategoryClient
 from src.api.client.contact_client import ContactClient
 from src.api.client.favorite_client import FavoriteClient
+from src.api.client.image_client import ImageClient
 from src.api.client.payment_client import PaymentClient
+from src.api.client.postcode_client import PostcodeClient
 from src.api.client.product_spec_client import ProductSpecClient
+from src.api.client.report_client import ReportClient
+from src.api.client.totp_client import TOTPClient
 from src.api.client.user_client import UserClient
 from src.common.config import TEST_USER_EMAIL, TEST_USER_PASSWORD
 
@@ -74,6 +78,34 @@ def contact_client() -> Generator[ContactClient]:
 def product_spec_client() -> Generator[ProductSpecClient]:
     """未登录的 Product Spec API 客户端。"""
     with ProductSpecClient() as client:
+        yield client
+
+
+@pytest.fixture
+def totp_client() -> Generator[TOTPClient]:
+    """未登录的 TOTP API 客户端。"""
+    with TOTPClient() as client:
+        yield client
+
+
+@pytest.fixture
+def report_client() -> Generator[ReportClient]:
+    """未登录的 Report API 客户端。"""
+    with ReportClient() as client:
+        yield client
+
+
+@pytest.fixture
+def image_client() -> Generator[ImageClient]:
+    """未登录的 Image API 客户端。"""
+    with ImageClient() as client:
+        yield client
+
+
+@pytest.fixture
+def postcode_client() -> Generator[PostcodeClient]:
+    """未登录的 Postcode API 客户端。"""
+    with PostcodeClient() as client:
         yield client
 
 
