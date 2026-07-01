@@ -18,9 +18,18 @@ practice-ai-testing/
 │   │   ├── brand.md
 │   │   ├── cart.md
 │   │   ├── category.md
+│   │   ├── contact.md
+│   │   ├── favorite.md
+│   │   ├── image.md
 │   │   ├── invoice.md
+│   │   ├── payment.md
+│   │   ├── postcode.md
+│   │   ├── product-spec.md
 │   │   ├── product.md
+│   │   ├── report.md
+│   │   ├── totp.md
 │   │   └── user.md
+│   ├── AI 辅助自动化测试开发 全阶段踩坑.md
 │   └── practice_software_testing_api.json
 ├── src/
 │   ├── api/
@@ -30,8 +39,16 @@ practice-ai-testing/
 │   │   │   ├── brand_client.py
 │   │   │   ├── cart_client.py
 │   │   │   ├── category_client.py
+│   │   │   ├── contact_client.py
+│   │   │   ├── favorite_client.py
+│   │   │   ├── image_client.py
 │   │   │   ├── invoice_client.py
+│   │   │   ├── payment_client.py
+│   │   │   ├── postcode_client.py
 │   │   │   ├── product_client.py
+│   │   │   ├── product_spec_client.py
+│   │   │   ├── report_client.py
+│   │   │   ├── totp_client.py
 │   │   │   └── user_client.py
 │   │   └── __init__.py
 │   ├── common/
@@ -48,8 +65,16 @@ practice-ai-testing/
 │   │   ├── test_brand_api.py
 │   │   ├── test_cart_api.py
 │   │   ├── test_category_api.py
+│   │   ├── test_contact_api.py
+│   │   ├── test_favorite_api.py
+│   │   ├── test_image_api.py
 │   │   ├── test_invoice_api.py
+│   │   ├── test_payment_api.py
+│   │   ├── test_postcode_api.py
 │   │   ├── test_product_api.py
+│   │   ├── test_product_spec_api.py
+│   │   ├── test_report_api.py
+│   │   ├── test_totp_api.py
 │   │   └── test_user_api.py
 │   ├── integration/
 │   │   └── __init__.py
@@ -64,6 +89,6 @@ practice-ai-testing/
 ├── update_tree.py
 └── uv.lock
 
-13 directories, 38 files
+13 directories, 63 files
 ```
 <!-- PROJECT_STRUCTURE_END -->

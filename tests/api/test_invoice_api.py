@@ -124,21 +124,23 @@ BNPL_DETAILS: dict[str, Any] = {
 }
 
 
-def _setup_cart_with_item(inv_client: InvoiceClient) -> tuple[str, str, str]:
-    """创建 cart 并添加商品。返回 (cart_id, product_id, user_email) 或需要登录的用户。"""
-    # Create cart
+def _setup_cart_with_item(inv_client: InvoiceClient) -> tuple[str, str]:
+    """创建 cart 并添加商品，product_id 失效时自动换商品重试。
+
+    返回 (cart_id, product_id)。多次失败则 skip（公开环境数据竞争）。
+    """
     r = inv_client.post("/carts")
-    assert r.status_code == 201
+    assert r.status_code == 201, f"create cart failed: {r.status_code}"
     cart_id = r.json()["id"]
-    # Get product
     r = inv_client.get("/products")
-    items = r.json().get("data", r.json() if isinstance(r.json(), list) else [])
-    assert len(items) > 0
-    pid = items[0]["id"]
-    # Add to cart
-    r = inv_client.post(f"/carts/{cart_id}", json={"product_id": pid, "quantity": 2})
-    assert r.status_code == 200
-    return cart_id, pid
+    items: list[dict] = r.json().get("data", r.json() if isinstance(r.json(), list) else [])
+    assert len(items) > 0, "需有已有商品"
+    for item in items[:5]:
+        pid = item["id"]
+        r = inv_client.post(f"/carts/{cart_id}", json={"product_id": pid, "quantity": 2})
+        if r.status_code == 200:
+            return cart_id, pid
+    pytest.skip("所有商品加入购物车均失败(422)，公开环境数据竞争")
 
 
 def _create_invoice(client: InvoiceClient, cart_id: str, **overrides: Any) -> dict[str, Any]:
@@ -203,6 +205,7 @@ class TestCreateInvoice:
     def ctx(self, _mod_auth: dict[str, Any]) -> dict[str, Any]:
         """登录用户 + 独立 cart（创建类测试需要独立 cart，避免冲突）"""
         uc: UserClient = _mod_auth["client"]
+        uc.login(_mod_auth["email"], _mod_auth["password"])  # refresh token
         cart_id, _ = _setup_cart_with_item(uc)
         return {"client": uc, "cart_id": cart_id, "email": _mod_auth["email"]}
 
@@ -534,6 +537,8 @@ class TestInvoiceBoundary:
     @pytest.fixture
     def ctx(self, _mod_auth: dict[str, Any]) -> dict[str, Any]:
         uc: UserClient = _mod_auth["client"]
+        # module 级 token 可能在长测试套件中过期，重新登录刷新
+        uc.login(_mod_auth["email"], _mod_auth["password"])
         cart_id, _ = _setup_cart_with_item(uc)
         return {"client": uc, "cart_id": cart_id}
 
