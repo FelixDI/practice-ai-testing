@@ -16,7 +16,12 @@ import pytest
 
 from src.api.client.brand_client import BrandClient
 from src.api.client.category_client import CategoryClient
+from src.api.client.contact_client import ContactClient
+from src.api.client.favorite_client import FavoriteClient
+from src.api.client.payment_client import PaymentClient
+from src.api.client.product_spec_client import ProductSpecClient
 from src.api.client.user_client import UserClient
+from src.common.config import TEST_USER_EMAIL, TEST_USER_PASSWORD
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +46,34 @@ def brand_client() -> Generator[BrandClient]:
 def category_client() -> Generator[CategoryClient]:
     """未登录的 Category API 客户端。"""
     with CategoryClient() as client:
+        yield client
+
+
+@pytest.fixture
+def favorite_client() -> Generator[FavoriteClient]:
+    """未登录的 Favorite API 客户端。"""
+    with FavoriteClient() as client:
+        yield client
+
+
+@pytest.fixture
+def payment_client() -> Generator[PaymentClient]:
+    """未登录的 Payment API 客户端。"""
+    with PaymentClient() as client:
+        yield client
+
+
+@pytest.fixture
+def contact_client() -> Generator[ContactClient]:
+    """未登录的 Contact API 客户端。"""
+    with ContactClient() as client:
+        yield client
+
+
+@pytest.fixture
+def product_spec_client() -> Generator[ProductSpecClient]:
+    """未登录的 Product Spec API 客户端。"""
+    with ProductSpecClient() as client:
         yield client
 
 
@@ -109,3 +142,20 @@ def authenticated_user(
 def generate_unique_email(prefix: str = "test") -> str:
     """生成唯一的测试邮箱。"""
     return f"{prefix}-{uuid.uuid4().hex[:8]}@e2e.example"
+
+
+# ---------------------------------------------------------------------------
+# module 级认证 Token（复用固定测试账号，减少注册请求量）
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def _mod_auth_token() -> Generator[str]:
+    """module 级：使用固定测试账号登录，返回 access_token。
+
+    适用于只读 / 不修改共享状态的操作。
+    """
+    with UserClient() as uc:
+        result = uc.login(TEST_USER_EMAIL, TEST_USER_PASSWORD)
+        token: str = result["access_token"]
+        yield token
+        uc.logout()
