@@ -267,7 +267,8 @@ class TestBrandAuthGaps:
     # [API_BRAND_029] P1
     def test_post_unauthenticated_401(self) -> None:
         bc = BrandClient()
-        r = bc.post("/brands", json={"name": "X", "slug": "unauth-x"})
+        slug = f"unauth-{uuid.uuid4().hex[:8]}"
+        r = bc.post("/brands", json={"name": "X", "slug": slug})
         assert r.status_code in (200, 201, 401), f"意外: {r.status_code}（公开环境可能无需认证）"
 
     # [API_BRAND_030] P1

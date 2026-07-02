@@ -301,7 +301,8 @@ class TestCategoryAuthGaps:
     # [API_CATEGORY_031] P1
     def test_post_unauthenticated_401(self) -> None:
         cc = CategoryClient()
-        r = cc.post("/categories", json={"name": "X", "slug": "unauth-cat"})
+        slug = f"unauth-{uuid.uuid4().hex[:8]}"
+        r = cc.post("/categories", json={"name": "X", "slug": slug})
         assert r.status_code in (200, 201, 401), f"意外: {r.status_code}（公开环境可能无需认证）"
 
     # [API_CATEGORY_032] P1
