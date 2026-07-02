@@ -1,119 +1,290 @@
 # practice-ai-testing 项目开发规范
 
 ## 项目概述
-- 定位：AI-Driven Test Automation Framework
-- 被测对象：Practice Software Testing（Toolshop），一个手工具电商演示系统
-  - UI 地址：https://practicesoftwaretesting.com
-  - Swagger接口文档：https://api.practicesoftwaretesting.com/api/documentation
-  - API 地址：https://api.practicesoftwaretesting.com
+
+- **定位**：AI-Driven Test Automation Framework
+- **被测对象**：Practice Software Testing（Toolshop），手工具电商演示系统
+  - UI：`https://practicesoftwaretesting.com`
+  - Swagger 接口文档：`https://api.practicesoftwaretesting.com/api/documentation`
+  - API：`https://api.practicesoftwaretesting.com`
   - API 文档：OpenAPI 3.0（`docs/practice_software_testing_api.json`）
-- 核心目标：基于 Claude Code + DeepSeek V4 Pro 完整跑通 AI 协作开发流程，建立可复制的自动化测试体系
+- **核心目标**：基于 Claude Code 完整跑通 AI 协作开发流程，建立可复制的自动化测试体系
 
 ## 技术栈
+
 - Python 3.12 | Pytest | Playwright（UI）| Requests（API）
-- 包管理：uv，虚拟环境 `.venv`，依赖写入 `pyproject.toml`，禁止手动修改 `uv.lock`
-- 报告：Allure
+- 包管理：uv，虚拟环境 `.venv`，依赖写入 `pyproject.toml`，**禁止手动修改 `uv.lock`**
+- 报告：Allure（pytest 产出原始数据 → CI 生成 HTML → GitHub Pages 发布）
 
 ## 目录结构（src-layout，严格遵守）
+
 ```
 src/
-  ui/pages/          # UI 页面对象（POM）
-  api/client/        # 接口客户端封装（API Object Pattern），按资源模块拆分
+  ui/pages/          # UI 页面对象（Page Object —— 每个路由一个 Page）
+  ui/components/     # UI 组件对象（跨页面复用的 UI 片段：Header/Footer/ProductCard 等）
+  api/client/        # API 客户端封装（API Object Pattern），按资源模块拆分
   common/            # 配置、日志、通用工具
 tests/
-  ui/                # UI 测试脚本
-  api/               # 接口测试脚本
-  integration/       # 全链路集成测试脚本
-  conftest.py        # 全局 fixture，子模块可按需新增层级 conftest
+  ui/                # UI 测试
+  api/               # API 测试
+  integration/       # 全链路集成测试
+  conftest.py        # 全局 fixture
 docs/
-  test-cases/        # 业务测试用例设计文档（按模块拆分，与测试脚本一一对应）
+  test-cases/        # 测试用例设计文档（按模块，与测试脚本一一对应）
+  practice_software_testing_api.json
 ```
+
 - 禁止在项目根目录创建业务代码或测试文件，新增模块仅在 `src/` 和 `tests/` 内扩展
 - 本项目不需要 `src/db/`（被测系统为远程 API，无直接数据库访问权限）
 - 本项目暂不设 `tests/security/`（安全测试留给 Juice Shop 阶段）
 
-## AI 协作开发流程（强制执行顺序）
-1. 需求分析 → 了解被测模块的业务逻辑和 API 能力
-2. 测试用例设计 → 输出 MD 文档至 `docs/test-cases/`
-3. 测试脚本生成 → 基于用例编写 Pytest 代码
-4. 执行校验 → `pytest` 运行，分析失败原因
-5. 缺陷修复 → 定位是测试代码问题还是理解偏差，修正后重新验证
-6. 确认用例覆盖完整后，再进入下一模块
+## AI 协作开发流程（强制执行）
+
+```
+需求分析 → 测试用例设计 → 测试脚本生成 → pytest 验证 → 缺陷修复 → 覆盖完整 → 下一模块
+```
+
+1. 需求分析——了解业务逻辑和 API 能力
+2. 测试用例设计——输出 MD 至 `docs/test-cases/`
+3. 测试脚本生成——基于用例编写 Pytest
+4. 执行校验——`pytest` 运行，分析失败
+5. 缺陷修复——区分测试 Bug 还是环境问题
+6. 确认覆盖完整后进入下一模块
 
 ## 文档与脚本对应
-- `docs/test-cases/{module}.md` ↔ `tests/ui/test_{module}.py` / `tests/api/test_{module}.py`
-- 文件命名：与业务模块名一致，全小写，单词间用下划线（如 `brands.md`、`shopping_cart.md`）
 
-## 测试用例文档规范
-- 单条用例结构：**用例编号**（模块缩写-序号）→ **用例名称** → **优先级** → **前置条件** → **操作步骤** → **预期结果**
-- 每条用例必须标注优先级（P0/P1/P2/P3），按级别分批交付
-
-### 用例优先级定义（强制执行）
-
-| 级别 | 定义 | 覆盖内容 | 每端点数量 | 交付约束 |
-|:--:|------|------|:--:|------|
-| **P0** | 冒烟 / 核心链路 | 每个端点的 Happy Path（200/201/204）；关键必填字段校验缺失（422）；登录成功/失败（200/401） | 2~3 条 | 必须首批交付，P0 不通过则不做 P1 |
-| **P1** | 关键异常 / 高频边界 | 每个端点涉及权限的状态码（401/403）；不存在资源（404）；重复创建（409）；关键 schema 约束（password 强度、dob 范围） | 1~3 条 | P0 全部通过后交付 |
-| **P2** | 边界覆盖 | 按 schema 逐字段的 maxLength/minLength/format/range/enum 边界值；分页边界（page=0）；组合筛选 | 按字段数 | P1 全部通过后交付 |
-| **P3** | 深度防御 | 横向越权（A 操作 B 数据）；Token 过期/登出后操作；资源删除后再次操作；特殊字符注入（XSS/SQL）；三级嵌套；自引用；极端并发场景 | 按需 0~5 条 | 仅在安全测试或上线前审计时要求 |
-
-### 四维覆盖与优先级映射
-
-| 维度 | 优先覆盖等级 | 说明 |
-|------|:--:|------|
-| ① 核心链路（完整 Happy Path） | **P0** | 不通过 = 系统不可用 |
-| ② 边界条件（逐字段约束遍历） | **P2** | 逐个字段是体力活，放 P2 批量做 |
-| ③ 异常路径（逐状态码覆盖） | **P1** | 401/404/409/422 是高频 bug 来源 |
-| ④ 权限/状态组合 | **P1 + P3** | 未登录访问=P1；横向越权/Token 过期=P3 |
-
-### 分批交付流程
-1. **首先生成 P0+P1**，确认数量可控后输出文档
-2. 生成 P0+P1 对应测试脚本，pytest 全绿后推 Git
-3. **再生成 P2**，按字段逐一遍历补充边界用例
-4. 生成 P2 对应脚本，全绿后推 Git
-5. **P3 按需**，只在 CLAUDE.md 明确开启安全测试或用户显式要求时生成
-
-## UI 自动化规范
-- 严格遵循 POM：页面元素定位与操作全部封装在页面对象中，用例不直接编写定位逻辑
-- 元素定位优先级：`data-test` > `get_by_role` 语义化定位 > `get_by_text`，禁止绝对 XPath 与脆弱 CSS 选择器
-- 等待机制：禁止 `time.sleep()`，依赖 Playwright 内置自动等待或 `expect` 条件等待
-- 断言统一使用 Playwright 内置 `expect`
-- 页面对象按功能区域拆分，如 `HomePage`、`ProductPage`、`CartPage`、`CheckoutPage`、`LoginPage` 等
-
-## 接口测试稳定性总纲（强制执行优先级）
-**核心背景**：被测站点 `practicesoftwaretesting.com` 为公开练习环境，服务端资源与并发承载能力有限，高频调用写接口（用户注册、购物车创建、发票创建）极易触发 500 服务端错误，属于环境波动而非测试代码逻辑问题。
-**整体防护思路**：优先从架构层面减少高频创建，其次做执行层自动重试，最后补充夹具层容错兜底，三层机制共同保障测试执行稳定性。
-**执行优先级**：数据复用（减少请求量） > 自动重试 > 夹具容错skip > 手动跳过用例
+- `docs/test-cases/{module}.md` ↔ `tests/api/test_{module}_api.py` + `src/api/client/{module}_client.py`
+- 命名：全小写，下划线分隔（`brand.md`、`product_spec.md`）
 
 ---
 
-### 一、🚨 pytest.skip 强制约束（AI 必须遵守）
+## 测试用例文档规范
+
+- 单条结构：**用例编号（模块缩写-序号）→ 用例名称 → 优先级 → 前置条件 → 操作步骤 → 预期结果**
+- 用例编号格式：`API_{MODULE}_{序号}`（如 `API_BRAND_001`）
+- 每条必须标注 P0/P1/P2/P3
+
+### 优先级定义
+
+| 级别 | 定义 | 覆盖内容 | 每端点数量 | 交付约束 |
+|:--:|------|------|:--:|------|
+| **P0** | 冒烟 / 核心链路 | 每个端点的 Happy Path（200/201/204）；关键必填字段校验缺失（422）；登录成功/失败（200/401） | 2~3 | 必须首批交付，P0 不通过则不做 P1 |
+| **P1** | 关键异常 / 高频边界 | 每个端点涉及权限的状态码（401/403）；不存在资源（404）；重复创建（409）；关键 Schema 约束（password 强度、dob 范围） | 1~3 | P0 全部通过后交付 |
+| **P2** | 边界覆盖 | 按 Schema 逐字段的 maxLength/minLength/format/range/enum 边界值；分页边界（page=0）；组合筛选 | 按字段数 | P1 全部通过后交付 |
+| **P3** | 深度防御 | 横向越权（A 操作 B 数据）；Token 过期/登出后操作；资源删除后再次操作；特殊字符注入（XSS/SQL）；三级嵌套；自引用；极端并发场景 | 按需 0~5 | 仅在安全测试或上线前审计时要求 |
+
+### 四维覆盖模型
+
+| 维度 | 优先级 | 说明 |
+|------|:--:|------|
+| ① 核心链路（完整 Happy Path） | **P0** | 不通过 = 系统不可用 |
+| ② 边界条件（逐字段约束遍历） | **P2** | 体力活，批量做 |
+| ③ 异常路径（逐状态码覆盖） | **P1** | 401/404/409/422 是高频 Bug 来源 |
+| ④ 权限/状态组合 | **P1+P3** | 未登录=P1；横向越权/Token 过期=P3 |
+
+### 分批交付
+
+```
+P0+P1（首批）→ 脚本全绿 → 推 Git → P2（二批）→ 全绿 → 推 Git → P3（按需审计）
+```
+
+---
+
+## API 资源模块速览（14 个模块，严格按此顺序开发）
+
+| # | 模块 | 端点 | 主要操作 | 依赖 | 优先级 |
+|:--:|------|:--:|------|------|:--:|
+| 1 | User | 13 | 注册/登录/密码管理/用户信息 | 无 | 🔴 |
+| 2 | Brand | 7 | CRUD + 搜索 | 无 | 🔴 |
+| 3 | Category | 8 | CRUD + 树形 + 搜索 | 无 | 🔴 |
+| 4 | Product | 8 | CRUD + 搜索 + 关联 | Brand, Category | 🔴 |
+| 5 | Cart | 6 | 创建/管理/修改数量 | User, Product | 🔴 |
+| 6 | Invoice | 10 | 订单生成/查询/状态/PDF | User, Cart | 🔴 |
+| 7 | Favorite | 4 | 收藏管理 | User, Product | 🟡 |
+| 8 | Payment | 1 | 支付校验 | Invoice | 🟡 |
+| 9 | Contact | 6 | 留言/回复/附件 | 无 | 🟡 |
+| 10 | Product Spec | 6 | 规格管理 | Product | 🟡 |
+| 11 | TOTP | 2 | 两步验证 | User | 🟢 |
+| 12 | Report | 7 | 6 维度销售报表 | Invoice | 🟢 |
+| 13 | Image | 1 | 图片资源 | Product | 🟢 |
+| 14 | Postcode | 1 | 邮编查询 | 无 | 🟢 |
+
+---
+
+## OpenAPI 文档使用原则
+
+**优先复用 CLAUDE.md**，避免每次重新解析 OpenAPI 浪费 token。
+
+```
+需要接口细节？
+├── 否 → 复用 CLAUDE.md / 已有代码 / 记忆
+└── 是 → 按需读取 docs/practice_software_testing_api.json
+         └── 只读当前模块的 paths + components/schemas
+```
+
+| 必须读 | 无需读 |
+|------|------|
+| 设计新模块用例 | 修改已有测试代码 |
+| 编写 API Client | 修复断言/Fixture |
+| 校验 Schema/状态码 | 调整 CI/CD/conftest |
+| 文档更新后同步 | 补充 P2/P3 用例 |
+
+---
+
+## API 自动化规范
+
+### API Object Pattern
+
+- 按资源模块封装独立 Client 类，继承 `BaseClient`
+- 每个 Client 对应 API 文档一个 Tag，方法名与业务语义对齐
+- 请求头、鉴权、异常处理统一在 `BaseClient` 中
+
+```python
+# src/api/client/{module}_client.py
+class BrandClient(BaseClient):
+    def get_brands(self) -> Any:
+        return self.get("/brands")
+```
+
+- API 基础地址统一从 `src/common/config.py` 读取，禁止硬编码
+- 固定测试账号在 `config.py` 中维护，优先复用
+- **断言双校验原则**：标准做法为「响应状态码 + 数据库双校验」。Toolshop 为远程 API 无数据库直连权限，**退而求其次**——必须同时校验响应状态码 + 核心业务字段（至少 2 项），仅断言状态码视为不合格
+
+### 测试结构模式
+
+```python
+# tests/api/test_{module}_api.py
+class TestGetBrands:
+    def test_get_brands_200(self, client): ...      # P0
+    def test_unauthorized_401(self, client): ...      # P1
+
+class TestCreateBrand:
+    def test_create_201(self, client): ...            # P0
+    def test_missing_name_422(self, client): ...      # P0
+    def test_duplicate_slug_409(self, client): ...    # P1
+```
+
+---
+
+## UI 自动化规范
+
+### 架构：Page + Component 双层封装
+
+```
+src/ui/
+├── pages/           # 页面对象 —— 每个路由一个 Page
+│   ├── home_page.py
+│   ├── product_page.py
+│   └── ...
+└── components/      # 组件对象 —— 跨页面复用的 UI 组件
+    ├── header.py        # 顶部导航栏（分类菜单、搜索框、购物车图标）
+    ├── footer.py        # 页脚
+    ├── product_card.py  # 商品卡片（首页列表、分类页、搜索页共用）
+    └── login_form.py    # 登录表单（LoginPage、弹窗共用）
+```
+
+- **Page**：对应一个路由，负责页面级操作（`goto`、等待加载完成）
+- **Component**：跨页面复用的 UI 片段，Page 通过组合引入 Component，禁止在 Page 中重复实现 Component 已有的逻辑
+
+### 定位与等待
+
+- 定位优先级：`data-test` > `get_by_role` > `get_by_text`
+- **禁止** 绝对 XPath、脆弱 CSS 选择器
+- **禁止** `time.sleep()`，用 Playwright 自动等待或 `expect` 条件等待
+- 断言统一使用 `expect`
+
+### 页面对象清单（基于 Toolshop 实测导航）
+
+| 区域 | 页面对象 | 路由 | 需登录 |
+|------|------|------|:--:|
+| 首页/商品列表 | `HomePage` | `/` | — |
+| 分类浏览 | `CategoryPage` | `/category/{slug}` | — |
+| 商品详情 | `ProductPage` | `/product/{id}` | — |
+| 租赁商品 | `RentalsPage` | `/rentals` | — |
+| 登录 | `LoginPage` | `/auth/login` | — |
+| 注册 | `RegisterPage` | `/auth/register` | — |
+| 购物车 | `CartPage` | 侧边栏 / 弹窗 | — |
+| 结账 | `CheckoutPage` | `/checkout` | ✅ |
+| 用户中心 | `ProfilePage` | `/account/profile` | ✅ |
+| 收藏列表 | `FavoritesPage` | `/account/favorites` | ✅ |
+| 订单列表 | `InvoicesPage` | `/account/invoices` | ✅ |
+| 留言 | `MessagesPage` | `/account/messages` | ✅ |
+| 联系我们 | `ContactPage` | `/contact` | — |
+
+---
+
+## Fixture 管理规范
+
+### 作用域分层决策（禁止一刀切）
+
+| 优先级 | 场景 | 作用域 |
+|:--:|------|:--:|
+| 1 | 修改共享状态（改密码、登出、删除用户） | `function` |
+| 2 | 只读 / 创建但不修改共享状态 | `module` |
+| 3 | 全局不变配置（base_url、测试账号） | `session` |
+
+### 高频创建控制
+
+- **必须** 优先复用 `config.py` 固定测试账号
+- **禁止** 同文件内每用例重复注册用户 / 创建购物车 / 创建发票
+- **必须** 将注册、创建购物车等封装为 `module` 级夹具
+- **必须** 在夹具 `yield` 后清理数据（容错静默放行）
+
+### 夹具容错
+
+- 夹具 setup 阶段遇到 500/超时 → 自动重试 2 次 → 仍失败 `pytest.skip`（含具体 reason）
+- 后置清理遇到 500/409 → 静默放行，不抛断言
+
+---
+
+## 接口测试稳定性总纲
+
+> **核心背景**：被测站点 `practicesoftwaretesting.com` 为公开练习环境，服务端资源与并发承载能力有限。高频调用写接口（用户注册、购物车创建、发票创建）极易触发 500，属于**环境波动而非测试代码逻辑问题**。
+
+**防护三层机制（执行优先级从高到低）**：
+
+```
+数据复用（减少请求量） > 自动重试 > 夹具容错 skip > 手动跳过用例
+```
+
+---
+
+### 🚨 pytest.skip 强制约束（AI 必须遵守）
 
 #### 禁止行为
+
 - **禁止** 为"让测试通过"而使用 `pytest.skip` —— 跳过不是通过
 - **禁止** 在 P0/P1 核心业务用例中使用 `pytest.skip`，除非被测服务整体不可用（502/503/连接超时）
 - **禁止** 无 `reason` 参数或使用 "skip this test" 等模糊描述
 - **禁止** 在业务断言失败、测试代码逻辑错误场景使用 `pytest.skip` 掩盖问题
 
 #### 生效前置规则
+
 1. 必须先触发自动重试机制，连续重试全部失败后，再判断是否符合 skip 条件
 2. 仅夹具 setup 阶段的环境类错误允许 skip；用例执行阶段的业务断言失败禁止 skip
-3. 单次偶发 500 不得直接 skip，必须满足「连续2次重试失败」阈值
+3. 单次偶发 500 不得直接 skip，必须满足「连续 2 次重试失败」阈值
 
-#### 允许行为（仅限以下场景，且 `reason` 必须具体）
+#### 允许 skip 的场景（仅限以下，`reason` 必须具体）
+
 | 场景 | 示例 |
 |------|------|
 | 被测服务整体不可用 | `reason="服务返回 503，环境不可用"` |
-| 依赖数据被删除且无法重建 | `reason="指定SKU已下架，无法复现加购场景"` |
-| 运行环境不满足前置条件 | `reason="仅Linux环境支持该校验逻辑"` |
-| 夹具前置操作连续重试2次仍失败的服务端环境异常 | `reason="创建购物车连续2次返回500，服务端环境异常"` |
+| 依赖数据被删除且无法重建 | `reason="指定 SKU 已下架，无法复现加购场景"` |
+| 运行环境不满足前置条件 | `reason="仅 Linux 环境支持该校验逻辑"` |
+| 夹具前置操作连续重试 2 次仍失败的服务端环境异常 | `reason="创建购物车连续2次返回500，服务端环境异常"` |
 
-#### 遇到测试失败时的优先级（强制执行）
-1. **修测试代码** —— 断言是否正确？参数是否匹配接口文档？路径是否拼写正确？
-2. **修被测环境/数据** —— 服务是否正常？测试数据是否有效？是否触发了环境限流？
-3. **最后才跳过** —— 仅限外部不可控因素，且必须说明具体原因
+---
 
-#### AI 必须报告（不得自行处理）
+### 遇到测试失败时的修复优先级（强制执行）
+
+```
+1. 修测试代码 —— 断言是否正确？参数是否匹配接口文档？路径是否拼写正确？
+2. 修被测环境/数据 —— 服务是否正常？测试数据是否有效？是否触发了环境限流？
+3. 最后才跳过 —— 仅限外部不可控因素，且必须说明具体原因
+```
+
+### AI 必须报告（不得自行处理）
+
 以下情况必须向我报告，等待确认后再操作：
 - 同一接口连续 3 次返回 500
 - 接口文档与实际返回不一致（字段缺失、状态码不符、结构差异等）
@@ -121,131 +292,92 @@ docs/
 
 ---
 
-### 二、接口自动化规范
-- 严格遵循 API Object Pattern：按资源模块（Brand、Product、Cart、Invoice、User 等）封装独立客户端类
-- 每个客户端类对应 API 文档中的一个 Tag（资源组），方法名与接口业务语义对齐
-- 请求头、鉴权、基础异常处理统一封装在基类中，用例层仅关注业务场景与断言
-- 接口基础地址统一从配置读取（`src/common/config.py`），禁止硬编码完整 URL
-- 核心业务场景做请求-响应完整性校验（状态码、响应体结构、关键字段业务逻辑）
+### 失败自动重试规范
+
+**插件配置**：`pyproject.toml` 已配 `addopts = "--reruns 2 --reruns-delay 1"`
+
+**重试触发边界（严格限定）**：
+
+| 允许触发重试 | 禁止触发重试 |
+|------|------|
+| 服务端 500/502/503/504 | 业务断言失败（预期 422 实际 200） |
+| 连接超时、网络断开、DNS 解析失败 | 非幂等写接口（注册重复 → 409） |
+| — | 权限校验（401/403）、资源不存在（404）、参数校验失败（422） |
+
+**与 skip 机制联动**：自动重试 2 次全部失败，且属于环境类异常时，夹具层可执行 `pytest.skip` 兜底。业务逻辑类失败不触发重试、不允许跳过，必须定位根因并修复。
 
 ---
 
-### 三、夹具管理规范 (Fixture Management)
+## CI/CD 规范
 
-#### 作用域优先级（分层决策，禁止一刀切）
+### Workflow 触发条件
 
-| 优先级 | 场景 | 作用域 | 判断依据 |
-|:--:|------|:--:|------|
-| 1 | **写操作修改共享状态**（改密码、登出、删除用户） | `function` | 数据隔离优先，避免用例间状态污染 |
-| 2 | **只读/创建但不修改共享状态**（创建订单、查订单、改订单状态） | `module` | 安全复用，大幅减少请求量 |
-| 3 | **全局不变配置**（base_url、固定测试账号） | `session` | 跨文件复用 |
+| Workflow | 触发 | 作用 |
+|------|------|------|
+| **API Tests** | push/PR 到 main（`src/` `tests/api/` `pyproject.toml` `uv.lock` 变更） | 跑全量 API 测试 |
+| **Deploy Allure** | API Tests 完成（仅 success） | 生成 Allure HTML → 发布 GitHub Pages |
 
-**判断流程**：
-1. 先看测试文件里有没有"修改共享状态"的操作（改密码、登出、删除）
-2. 如果有 → `function` 级，不共享
-3. 如果没有 → `module` 级，安全复用
+### CI 失败处理
 
-#### 高频创建控制（强制执行）
-- **必须** 优先使用 `config.py` 中预置的固定测试账号登录复用；仅权限隔离、数据唯一性测试等必须独立用户的场景，才可动态注册新用户
-- **禁止** 在同一个测试文件中，每个用例都重新注册用户
-- **禁止** 在同一个测试文件中，每个用例都重新创建购物车/发票基础数据
-- **必须** 将注册用户、创建购物车等前置操作封装为 `module` 级夹具
-- **必须** 在夹具 `yield` 后置逻辑中补充数据清理（如删除测试用户、清空购物车）
+1. 去 Actions 页面看 `junit.xml`（Artifacts）定位失败用例
+2. 本地 `pytest tests/api/test_{module}_api.py -v` 复现
+3. 如果是环境波动（500/超时），重跑 CI 即可
+4. 如果是断言失败，修测试代码后推送
+5. Allure 报告地址：`https://felixdi.github.io/practice-ai-testing/api-allure-report/`
 
-#### 数据隔离规则
-- `module` 级夹具仅适用于读操作、不修改共享数据的用例
-- 若用例会修改用户/购物车/发票核心状态，需单独创建 `function` 级数据，避免用例间互相污染
+### 首次部署 Pages
 
-#### 后置清理容错
-- 夹具后置清理操作（删除测试用户、清空购物车）若返回 500/409 等服务端异常，直接静默放行，不得抛出断言错误
-- 公开练习环境不强制保证数据清理成功，禁止因清理失败导致用例报错
-
-#### 夹具容错
-- 夹具数据准备阶段，若遇到服务端 500/连接超时等环境错误，先自动重试 2 次，仍失败则主动 `pytest.skip` 并附带详细原因
-- 容错跳过必须在 `reason` 中说明具体状态码和响应内容，不得模糊表述
+`gh-pages` 分支由 CI 自动创建。首次推送后去 `Settings → Pages` 选择 `gh-pages` 分支即可。
 
 ---
-
-### 四、失败自动重试规范
-
-#### 插件配置
-- **必须** 在 `pyproject.toml` 中添加 `pytest-rerunfailures` 依赖
-- 在 `pyproject.toml` 中配置全局重试策略：
-  ```toml
-  [tool.pytest.ini_options]
-  addopts = "--reruns 2 --reruns-delay 1"
-  ```
-
-#### 重试触发边界（严格限定）
-- **仅允许触发重试的场景**：服务端 500/502/503/504、连接超时、网络断开、DNS 解析失败等环境类异常
-- **禁止触发重试的场景**：
-  - 业务断言失败（如预期 422 实际返回 200、响应体字段校验不通过）
-  - 非幂等写接口（如用户注册、重复创建会触发 409 冲突的接口）
-  - 权限校验类错误（401/403）、资源不存在（404）、参数校验失败（422）
-
-#### 与 skip 机制联动
-- 自动重试 2 次全部失败，且属于环境类异常时，夹具层可执行 `pytest.skip` 兜底
-- 业务逻辑类失败不触发重试、不允许跳过，必须定位根因并修复
-
-## OpenAPI 文档使用原则（Context 管理）
-
-项目内 `CLAUDE.md` 已维护 API 资源速览、开发流程、测试规范等长期知识。AI 应**优先复用已有上下文**，避免每次重新解析 OpenAPI 文档浪费 token。
-
-### 决策流程
-
-```
-需要接口细节？
-├── 否 → 复用 CLAUDE.md / 已有测试代码 / 记忆
-└── 是 → 按需读取 docs/practice_software_testing_api.json
-         └── 仅读取当前模块相关 paths + components/schemas，不全量加载
-```
-
-### 必须读取 OpenAPI 的场景
-
-- 设计新模块测试用例（确认端点、参数、Schema）
-- 编写 API Client（确认 Path、Method、Request Body、Response）
-- 校验字段约束、枚举值、状态码
-- 接口文档更新后重新同步
-
-### 无需读取 OpenAPI 的场景
-
-- 修改已有测试代码（断言、fixture、参数）
-- 修复测试失败
-- 调整 CI/CD、conftest、公共工具
-- 修改 UI 页面对象
-- 补充 P2/P3 用例（字段边界已在用例文档中记录）
-
-> **核心原则**：CLAUDE.md 中的 API 资源模块速览（下方）覆盖了 14 个模块的全部端点和依赖关系。只有在需要具体 Schema 细节时才读 OpenAPI。
-
----
-
-## API 资源模块速览（Toolshop API v5.0.0，14 个模块）
-
-按业务依赖关系与用户操作链路排序，AI 生成代码时严格按此顺序执行：
-
-| 序号 | 模块 | 主要操作 | 依赖 | 优先级 |
-|:--:|------|---------|------|:--:|
-| 1 | User | 注册/登录/密码管理/用户信息 | 无 | 🔴 高 |
-| 2 | Brand | CRUD + 搜索 | 无（读操作公开） | 🔴 高 |
-| 3 | Category | CRUD + 树形结构 + 搜索 | 无（读操作公开） | 🔴 高 |
-| 4 | Product | CRUD + 搜索 + 关联产品 | Brand、Category | 🔴 高 |
-| 5 | Cart | 创建/管理购物车、修改数量 | User、Product | 🔴 高 |
-| 6 | Invoice | 订单生成/查询/状态管理/PDF | User、Cart | 🔴 高 |
-| 7 | Favorite | 收藏管理 | User、Product | 🟡 中 |
-| 8 | Payment | 支付校验 | Invoice | 🟡 中 |
-| 9 | Contact | 留言/回复/附件 | 无 | 🟡 中 |
-| 10 | Product Spec | 产品规格管理 | Product | 🟡 中 |
-| 11 | TOTP | 两步验证 | User | 🟢 低 |
-| 12 | Report | 销售报表（6 个维度） | Invoice | 🟢 低 |
-| 13 | Image | 图片资源 | Product | 🟢 低 |
-| 14 | Postcode | 邮编查询 | 无 | 🟢 低 |
-
-> 排序逻辑：先跑通不依赖其他模块的（1-3），再按电商用户操作链路（4-6），最后补充非核心模块（7-14）。
 
 ## 通用编码规范
-- 测试文件：`test_{module}.py`，测试函数：`test_{场景描述}`，测试类：`Test{模块名}`
-- 公共能力优先封装到 `src/`，避免用例中重复逻辑
+
+```python
+# ✅ 文件头
+from __future__ import annotations
+from typing import Any
+
+# ✅ 类型注解
+def test_something(self, client: BrandClient) -> None:
+
+# ✅ 断言含诊断信息
+assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
+
+# ✅ 唯一数据用 uuid
+import uuid
+slug = f"test-{uuid.uuid4().hex[:8]}"
+
+# ❌ 禁止硬编码
+url = "https://api.practicesoftwaretesting.com/brands"  # 走 config
+time.sleep(2)                                           # 用 expect 等待
+```
+
+- 测试文件：`test_{module}_api.py`，函数：`test_{场景描述}`，类：`Test{模块名}`
+- 公共能力封装到 `src/`，不放在 `tests/` 下
 - 遵循 PEP8，命名语义化
-- 依赖管理：`uv add 包名`，禁止 `pip install`
-- pytest 配置集中在 `pyproject.toml` 的 `[tool.pytest.ini_options]` 中
-- 运行测试：项目根目录执行 `pytest`
+- `uv add 包名`，禁止 `pip install`
+- pytest 配置集中在 `pyproject.toml` 的 `[tool.pytest.ini_options]`
+- 运行测试：项目根目录 `pytest`（由 `.venv` 提供环境）
+
+---
+
+## 踩坑速查
+
+> 以下是本项目特有的高频陷阱。新增模块或修测试时必须参考。
+
+| # | 坑 | 现象 | 正确做法 |
+|:--:|------|------|------|
+| 1 | **固定账号 + 可变状态 = 409** | module 夹具收藏了商品 A，function 测试也想收藏 → 409 | function 级测试用 `_get_unfavorited_product()` 先查列表 |
+| 2 | **module 夹具 token 过期** | 全量跑 12+ 分钟，后面测试 POST/PUT 全返回 401 | 在 `ctx` 夹具里加 `uc.login()` 重新登录 |
+| 3 | **硬编码 slug 跨 CI run 冲突** | 上次 CI 创建了 `slug="unauth-x"`，这次再创 → 409 | 用 `uuid.uuid4().hex[:8]` 动态生成唯一值 |
+| 4 | **地址校验随机波动** | `POST /invoices` 返回 422 "city does not belong to country" | 准备多个备选地址（`BILLING_FALLBACKS`），逐个尝试 |
+| 5 | **商品 ID 数据竞争** | 添加商品到购物车返回 422 "product id is invalid" | 遍历前 5 个商品，找到一个能成功添加的 |
+| 6 | **OpenAPI 文档 ≠ 实际行为** | 文档说 400，实际 422；文档说 404，实际 204 | 以实测为准，代码里 `assert status_code in (X, Y)` 弹性断言 |
+| 7 | **同一账号多测试文件共享** | `customer@practicesoftwaretesting.com` 被多个文件同时用 | 只读操作用固定账号；写操作注册独立账号 |
+
+---
+
+## Agent 规范（占位，待多 Agent 工作流启用后补充）
+
+> 当前项目仅单 Agent 模式。后续启用 Workflow 多 Agent 编排时，在此补充 Agent 分工、通信协议、工作目录隔离策略。
