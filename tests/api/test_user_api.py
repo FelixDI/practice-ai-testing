@@ -36,30 +36,12 @@ VALID_PAYLOAD: dict[str, Any] = {
 
 
 def _register(user_client: UserClient, email: str, **overrides: Any) -> dict[str, Any]:
-    """注册用户，服务端 500 时自动重试 2 次（公开环境偶发波动）。"""
-    import time
-
     data = copy.deepcopy(VALID_PAYLOAD)
     data["email"] = email
     data.update(overrides)
-
-    last_status = None
-    last_text = ""
-    for attempt in range(3):
-        r = user_client.post("/users/register", json=data)
-        if r.status_code == 201:
-            return r.json()
-        last_status = r.status_code
-        last_text = r.text
-        if r.status_code >= 500:
-            time.sleep(1)
-            continue
-        # 非 500（如 409/422）不重试
-        break
-    assert False, (
-        f"prep register failed after retries: "
-        f"last status={last_status}, body={last_text[:200]}"
-    )
+    r = user_client.post("/users/register", json=data)
+    assert r.status_code == 201, f"prep register failed: {r.status_code} {r.text}"
+    return r.json()
 
 
 # ======================================================================
