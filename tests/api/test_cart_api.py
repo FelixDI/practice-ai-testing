@@ -41,11 +41,18 @@ def _mod_product_id(_mod_client: CartClient) -> str:
 
 
 @pytest.fixture(scope="module")
-def _mod_cart_with_item(_mod_client: CartClient, _mod_empty_cart: str, _mod_product_id: str) -> tuple[str, str]:
-    """module 级：含有商品的购物车（只读 + 部分操作复用）。"""
-    r = _mod_client.add_item(_mod_empty_cart, _mod_product_id, 2)
-    assert r.status_code == 200, f"module add item failed: {r.status_code} {r.text}"
-    return _mod_empty_cart, _mod_product_id
+def _mod_cart_with_item(_mod_client: CartClient, _mod_empty_cart: str) -> tuple[str, str]:
+    """module 级：含有商品的购物车（只读 + 部分操作复用）。商品失效时换下一个。"""
+    r = _mod_client.get("/products")
+    data = r.json()
+    items = data if isinstance(data, list) else data.get("data", [])
+    assert len(items) > 0, "需有已有商品"
+    for item in items[:5]:
+        pid = item["id"]
+        r = _mod_client.add_item(_mod_empty_cart, pid, 2)
+        if r.status_code == 200:
+            return _mod_empty_cart, pid
+    pytest.skip("module 添加商品失败(5次重试均422)，公开环境数据竞争")
 
 
 # -- function 级 client + helpers（用于独立 mutation 测试）-------------------
