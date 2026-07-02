@@ -1,6 +1,6 @@
 """HomePage 模块 UI 测试。
 
-蓝图：docs/test-cases/home_page.md —— 8 条用例。
+蓝图：docs/test-cases/home_page.md —— 13 条用例（P0×4 + P1×4 + P2×4 + P3×1）。
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from src.ui.pages.home_page import HomePage
 def home(page: Page) -> HomePage:
     hp = HomePage(page)
     hp.goto()
-    page.wait_for_selector("[data-test=nav-home]", timeout=30000)
+    expect(hp.nav_home).to_be_visible(timeout=60000)
     return hp
 
 
@@ -81,13 +81,6 @@ class TestSortAndNav:
 class TestSearchBoundary:
     """P2 搜索边界。"""
 
-    @pytest.fixture
-    def home(self, page: Page) -> HomePage:
-        hp = HomePage(page)
-        hp.goto()
-        page.wait_for_selector("[data-test=nav-home]", timeout=30000)
-        return hp
-
     # [UI_HOME_009] P2
     def test_search_overlong_input(self, home: HomePage) -> None:
         home.search("A" * 150)
@@ -105,13 +98,6 @@ class TestSearchBoundary:
 
 class TestSortAndPagination:
     """P2 排序 + 分页。"""
-
-    @pytest.fixture
-    def home(self, page: Page) -> HomePage:
-        hp = HomePage(page)
-        hp.goto()
-        page.wait_for_selector("[data-test=nav-home]", timeout=30000)
-        return hp
 
     # [UI_HOME_011] P2
     def test_sort_all_options(self, home: HomePage) -> None:
@@ -149,7 +135,7 @@ class TestLoggedInState:
         # 回到首页
         hp = HomePage(page)
         hp.goto()
-        page.wait_for_selector("[data-test=nav-home]", timeout=30000)
+        expect(hp.nav_home).to_be_visible(timeout=60000)
         return hp
 
     # [UI_HOME_013] P3
