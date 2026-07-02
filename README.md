@@ -21,6 +21,7 @@ practice-ai-testing/
 │   │   ├── category.md
 │   │   ├── contact.md
 │   │   ├── favorite.md
+│   │   ├── home_page.md
 │   │   ├── image.md
 │   │   ├── invoice.md
 │   │   ├── payment.md
@@ -54,10 +55,12 @@ practice-ai-testing/
 │   │   └── __init__.py
 │   ├── common/
 │   │   ├── __init__.py
-│   │   └── config.py
+│   │   ├── config.py
+│   │   └── pytest_mcp_server.py
 │   ├── ui/
 │   │   ├── pages/
-│   │   │   └── __init__.py
+│   │   │   ├── __init__.py
+│   │   │   └── home_page.py
 │   │   └── __init__.py
 │   └── __init__.py
 ├── tests/
@@ -80,7 +83,9 @@ practice-ai-testing/
 │   ├── integration/
 │   │   └── __init__.py
 │   ├── ui/
-│   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   ├── conftest.py
+│   │   └── test_home_page.py
 │   ├── __init__.py
 │   └── conftest.py
 ├── CLAUDE.md
@@ -90,7 +95,7 @@ practice-ai-testing/
 ├── update_tree.py
 └── uv.lock
 
-13 directories, 63 files
+13 directories, 68 files
 ```
 <!-- PROJECT_STRUCTURE_END -->
 

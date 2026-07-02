@@ -12,7 +12,7 @@ description: 按四维覆盖 + 优先级检查模块测试用例是否有遗漏
 
 ## 2. 审计流程
 
-1. 读取 `docs/test-cases/$ARGUMENTS.md`，统计已有用例及覆盖的优先级（P0/P1/P2/P3）。
+1. 读取 `docs/test-cases/api/$ARGUMENTS.md` 或 `docs/test-cases/ui/$ARGUMENTS.md` 或 `docs/test-cases/integration/$ARGUMENTS.md`，统计已有用例及覆盖的优先级（P0/P1/P2/P3）。
 2. 读取 API 文档中该模块的全部端点，确认每个端点至少有 2~3 条 P0 用例。
 3. 逐维度检查遗漏：
    - **① 核心链路**：每个端点的 Happy Path（200/201/204）是否都有 P0 覆盖。
@@ -46,7 +46,7 @@ description: 按四维覆盖 + 优先级检查模块测试用例是否有遗漏
 
 ## 4. 处理遗漏
 
-- 如果遗漏 ≤ 5 条：直接补充到 `docs/test-cases/$ARGUMENTS.md`，然后为新增用例编写测试脚本，用 MCP 工具 `run_pytest($ARGUMENTS)` 验证修复直至通过。
+- 如果遗漏 ≤ 5 条：直接补充到对应的 `docs/test-cases/<类型>/$ARGUMENTS.md`，然后为新增用例编写测试脚本，用 MCP 工具 `run_pytest($ARGUMENTS)` 验证修复直至通过。
 - 如果遗漏 > 5 条：列出遗漏清单，询问是否逐项补充。
 
 ## 5. 验证（强制执行）

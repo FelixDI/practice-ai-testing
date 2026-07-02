@@ -30,7 +30,8 @@ description: 按四维覆盖模型为指定模块生成测试用例文档
 ## 5. 输出格式
 
 - 为每个模块分别创建一个独立的 Markdown 文件。
-- 文件命名：`<模块名>.md`（全小写下划线，如 `cart.md`），保存到 `docs/test-cases/` 目录下。
+- 文件命名：`<模块名>.md`（全小写下划线，如 `cart.md`）。
+- **API 测试**保存到 `docs/test-cases/api/`；**UI 测试**保存到 `docs/test-cases/ui/`；**集成测试**保存到 `docs/test-cases/integration/`。
 - 每条用例包含一个 Markdown 表格，字段为：
   - 用例编号（如 API_$ARGUMENTS_001）
   - 优先级（P0/P1/P2/P3）

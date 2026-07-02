@@ -12,8 +12,8 @@ description: 为指定模块生成 API/UI 自动化测试脚本
 
 ## 2. 生成流程（严格按顺序）
 
-1. 读取 docs/test-cases/$ARGUMENTS.md，理解该模块的全部用例。
-2. **API 测试**：如果 src/api/client/$ARGUMENTS_client.py 不存在，先创建 API Client 类。**UI 测试**：如果 src/ui/pages/$ARGUMENTS_page.py 或 src/ui/components/ 下组件不存在，先创建对应 POM 类。
+1. **API 测试**：读取 `docs/test-cases/api/$ARGUMENTS.md`；**UI 测试**：读取 `docs/test-cases/ui/$ARGUMENTS.md`；**集成测试**：读取 `docs/test-cases/integration/$ARGUMENTS.md`。理解该模块的全部用例。
+2. **API 测试**：如果 `src/api/client/$ARGUMENTS_client.py` 不存在，先创建 API Client 类。**UI 测试**：如果 `src/ui/pages/$ARGUMENTS_page.py` 或 `src/ui/components/` 下组件不存在，先创建对应 POM 类。
 3. 按 P0 → P1 → P2 的分层顺序生成测试函数，并为 P3 预留位置。
 4. 每条测试函数标注对应的用例编号（API: `# [API_BRAND_001]`，UI: `# [UI_LOGIN_001]`）。
 

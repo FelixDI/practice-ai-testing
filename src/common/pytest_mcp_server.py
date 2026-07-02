@@ -116,7 +116,9 @@ def run_pytest(target: str = "all") -> dict:
     """
 
     if target == "all":
-        args = ["tests/api/"]
+        args = ["tests/"]
+    elif target in ("api", "ui", "integration"):
+        args = [f"tests/{target}/"]
     else:
         args = [find_test_file(target)]
 
@@ -140,7 +142,7 @@ def run_nodeid(nodeid: str) -> dict:
 def run_last_failed() -> dict:
     """重跑最近失败的测试。"""
 
-    return run(["--lf", "tests/api/"])
+    return run(["--lf", "tests/"])
 
 
 # --------------------------------------------------

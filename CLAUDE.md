@@ -30,7 +30,10 @@ tests/
   integration/       # 全链路集成测试
   conftest.py        # 全局 fixture
 docs/
-  test-cases/        # 测试用例设计文档（按模块，与测试脚本一一对应）
+  test-cases/
+    api/             # API 测试用例设计文档
+    ui/              # UI 测试用例设计文档
+    integration/     # 集成测试用例设计文档
   practice_software_testing_api.json
 ```
 
@@ -45,7 +48,7 @@ docs/
 ```
 
 1. 需求分析——了解业务逻辑和 API 能力
-2. 测试用例设计——输出 MD 至 `docs/test-cases/`
+2. 测试用例设计——输出 MD 至 `docs/test-cases/api/`、`docs/test-cases/ui/` 或 `docs/test-cases/integration/`
 3. 测试脚本生成——基于用例编写 Pytest
 4. 执行校验——`pytest` 运行，分析失败
 5. 缺陷修复——区分测试 Bug 还是环境问题
@@ -85,8 +88,10 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 
 ## 文档与脚本对应
 
-- `docs/test-cases/{module}.md` ↔ `tests/api/test_{module}_api.py` + `src/api/client/{module}_client.py`
-- 命名：全小写，下划线分隔（`brand.md`、`product_spec.md`）
+- `docs/test-cases/api/{module}.md` ↔ `tests/api/test_{module}_api.py` + `src/api/client/{module}_client.py`
+- `docs/test-cases/ui/{page}.md` ↔ `tests/ui/test_{page}.py` + `src/ui/pages/{page}.py`
+- `docs/test-cases/integration/{flow}.md` ↔ `tests/integration/test_{flow}.py`
+- 命名：全小写，下划线分隔（`brand.md`、`home_page.md`）
 
 ---
 
@@ -389,7 +394,7 @@ PYTEST = str(PROJECT_ROOT / ".venv" / "bin" / "pytest")  # 跨平台炸
 ```
 
 - **运行命令统一走 `uv run`**：`uv run pytest`、`uv run python`，**禁止**直接调用 `.venv/bin/python` 或硬编码 venv 路径（跨平台不兼容）
-- 测试文件：`test_{module}_api.py`，函数：`test_{场景描述}`，类：`Test{模块名}`
+- 测试文件：API `test_{module}_api.py`、UI `test_{page}.py`、集成 `test_{flow}.py`；函数：`test_{场景描述}`；类：`Test{模块名}`
 - 公共能力封装到 `src/`，不放在 `tests/` 下
 - 遵循 PEP8，命名语义化
 - `uv add 包名`，禁止 `pip install`
