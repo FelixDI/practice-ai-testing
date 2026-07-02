@@ -5,25 +5,21 @@
 
 from __future__ import annotations
 
-from playwright.sync_api import Page, Locator
+from playwright.sync_api import Locator
+
+from src.ui.pages.base_page import BasePage
 
 
-class HomePage:
+class HomePage(BasePage):
     """Toolshop 首页，展示商品列表、分类导航、搜索框。"""
 
-    def __init__(self, page: Page) -> None:
-        self._page = page
+    URL = "https://practicesoftwaretesting.com/"
 
     # -- Navigation -------------------------------------------------------
 
     def goto(self) -> None:
-        """Navigate to home page. Uses networkidle for SPA readiness."""
-        self._page.goto("https://practicesoftwaretesting.com/")
-        self._page.wait_for_load_state("networkidle")
-
-    @property
-    def title(self) -> str:
-        return self._page.title()
+        """导航到首页并等待 SPA 渲染完成。"""
+        super().goto(self.URL)
 
     # -- 搜索 -------------------------------------------------------------
 
@@ -69,7 +65,3 @@ class HomePage:
     @property
     def product_cards(self) -> Locator:
         return self._page.locator("a[href*='/product/']")
-
-    @property
-    def notification_bar(self) -> Locator:
-        return self._page.locator("[data-test=notification-bar]")

@@ -1,0 +1,35 @@
+"""BasePage —— 所有页面对象的基类。
+
+封装公共页面操作：
+- goto / 等待渲染
+- 页面标题
+- 通知栏（跨页面存在）
+"""
+
+from __future__ import annotations
+
+from playwright.sync_api import Page, Locator
+
+
+class BasePage:
+    """页面对象基类。"""
+
+    def __init__(self, page: Page) -> None:
+        self._page = page
+
+    # -- Navigation -------------------------------------------------------
+
+    def goto(self, url: str) -> None:
+        """导航到指定 URL 并等待 SPA 渲染完成。"""
+        self._page.goto(url)
+        self._page.wait_for_load_state("networkidle")
+
+    @property
+    def title(self) -> str:
+        return self._page.title()
+
+    # -- 公共元素 ---------------------------------------------------------
+
+    @property
+    def notification_bar(self) -> Locator:
+        return self._page.locator("[data-test=notification-bar]")
