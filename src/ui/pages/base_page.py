@@ -20,9 +20,12 @@ class BasePage:
     # -- Navigation -------------------------------------------------------
 
     def goto(self, url: str) -> None:
-        """导航到指定 URL 并等待 SPA 渲染完成。"""
-        self._page.goto(url)
-        self._page.wait_for_load_state("networkidle")
+        """导航到指定 URL（domcontentloaded + 手动等待元素更可靠）。"""
+        self._page.goto(url, wait_until="domcontentloaded")
+
+    def wait_for_page(self, selector: str, timeout: int = 15000) -> None:
+        """等待关键元素出现，确认页面渲染完成。"""
+        self._page.wait_for_selector(selector, timeout=timeout)
 
     @property
     def title(self) -> str:

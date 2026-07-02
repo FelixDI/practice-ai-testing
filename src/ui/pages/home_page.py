@@ -18,8 +18,9 @@ class HomePage(BasePage):
     # -- Navigation -------------------------------------------------------
 
     def goto(self) -> None:
-        """导航到首页并等待 SPA 渲染完成。"""
+        """导航到首页并等待关键元素渲染。"""
         super().goto(self.URL)
+        self.wait_for_page("[data-test=nav-home]")
 
     # -- 搜索 -------------------------------------------------------------
 
