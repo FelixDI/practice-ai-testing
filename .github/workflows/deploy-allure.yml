@@ -3,15 +3,14 @@ name: Deploy Allure Report
 on:
   workflow_run:
     workflows:
-      - API Tests
+      - Tests
     types:
       - completed
 
 permissions:
-  contents: write   # gh-pages 部署
-  actions: read     # 跨 workflow 下载 artifact
+  contents: write
+  actions: read
 
-# 避免并发写 gh-pages 冲突
 concurrency:
   group: allure-pages
   cancel-in-progress: false
@@ -27,18 +26,27 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------------
-      # 跨 workflow 下载 artifact（gh CLI 预装在 runner 上）
+      # 下载 API + UI Allure 数据
       # ------------------------------------------------------------------
       - name: Download API Allure Results
         run: |
           gh run download ${{ github.event.workflow_run.id }} \
             -n api-allure-results \
-            -D allure-results
+            -D api-allure-results
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download UI Allure Results
+        run: |
+          gh run download ${{ github.event.workflow_run.id }} \
+            -n ui-allure-results \
+            -D ui-allure-results \
+            || echo "UI 测试结果尚未就绪，跳过"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ------------------------------------------------------------------
-      # 安装 Allure CLI（缓存二进制，避免每次下载 ~70MB）
+      # 安装 Allure CLI（缓存 ~70MB 二进制）
       # ------------------------------------------------------------------
       - name: Cache Allure CLI
         id: cache-allure
@@ -54,20 +62,27 @@ jobs:
           tar -xzf allure-2.33.0.tgz
 
       # ------------------------------------------------------------------
-      # 生成报告 → 部署到 GitHub Pages
-      # 用 keep_files: true 为未来 UI 报告留共存空间
+      # 生成报告 → 部署 GitHub Pages
       # ------------------------------------------------------------------
-      - name: Generate Allure Report
+      - name: Generate API Allure Report
         run: |
           ./allure-2.33.0/bin/allure generate \
-            allure-results \
-            -o api-allure-report \
+            api-allure-results \
+            -o _site/api-allure-report \
             --clean
+
+      - name: Generate UI Allure Report
+        run: |
+          if [ -d "ui-allure-results" ]; then
+            ./allure-2.33.0/bin/allure generate \
+              ui-allure-results \
+              -o _site/ui-allure-report \
+              --clean
+          fi
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./api-allure-report
-          destination_dir: api-allure-report
+          publish_dir: ./_site
           keep_files: true

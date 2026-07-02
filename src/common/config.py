@@ -11,6 +11,12 @@ API_BASE_URL: str = os.getenv(
     "https://api.practicesoftwaretesting.com",
 )
 
+# UI 基础地址
+UI_BASE_URL: str = os.getenv(
+    "UI_BASE_URL",
+    "https://practicesoftwaretesting.com",
+)
+
 # 请求超时（秒）
 REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "30"))
 

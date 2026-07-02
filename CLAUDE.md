@@ -346,8 +346,8 @@ src/ui/
 
 | Workflow | 触发 | 作用 |
 |------|------|------|
-| **API Tests** | push/PR 到 main（`src/` `tests/api/` `pyproject.toml` `uv.lock` 变更） | 跑全量 API 测试 |
-| **Deploy Allure** | API Tests 完成（仅 success） | 生成 Allure HTML → 发布 GitHub Pages |
+| **Tests** | push/PR 到 main（`src/` `tests/` `pyproject.toml` `uv.lock` 变更） | API + UI 并行测试 |
+| **Deploy Allure** | Tests 完成（仅 success） | 生成 API/UI Allure HTML → 发布 GitHub Pages |
 
 ### CI 失败处理
 

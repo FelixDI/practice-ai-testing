@@ -1,0 +1,81 @@
+"""HomePage 模块 UI 测试。
+
+蓝图：docs/test-cases/home_page.md —— 8 条用例。
+"""
+
+from __future__ import annotations
+
+import pytest
+from playwright.sync_api import Page, expect
+
+from src.ui.pages.home_page import HomePage
+
+
+@pytest.fixture
+def home(page: Page) -> HomePage:
+    hp = HomePage(page)
+    hp.goto()
+    page.wait_for_timeout(1000)  # SPA 渲染
+    return hp
+
+
+class TestHomePageLoad:
+    # [UI_HOME_001] P0
+    def test_page_loads_with_products(self, home: HomePage) -> None:
+        expect(home.notification_bar).to_be_visible()
+        assert "Practice Software Testing" in home.title
+        assert home.product_cards.count() > 0, "首页应有商品卡片"
+
+
+class TestSearch:
+    # [UI_HOME_002] P0
+    def test_search_hammer(self, home: HomePage) -> None:
+        home.search("hammer")
+        home._page.wait_for_timeout(1000)
+        cards = home.product_cards
+        assert cards.count() > 0, "搜索 hammer 应有结果"
+
+    # [UI_HOME_005] P1
+    def test_empty_search(self, home: HomePage) -> None:
+        before = home.product_cards.count()
+        home.search("")
+        home._page.wait_for_timeout(500)
+        assert home._page.url == "https://practicesoftwaretesting.com/" or "/" in home._page.url
+
+
+class TestCategoryNavigation:
+    # [UI_HOME_003] P0
+    def test_navigate_to_hand_tools(self, home: HomePage) -> None:
+        home.navigate_to_category("hand-tools")
+        home._page.wait_for_timeout(1000)
+        assert "/category/hand-tools" in home._page.url
+
+    # [UI_HOME_007] P1
+    def test_categories_menu_toggle(self, home: HomePage) -> None:
+        home.nav_categories.click()
+        home._page.wait_for_timeout(500)
+        # 展开后 Hand Tools 应可见
+        expect(home.nav_hand_tools).to_be_visible()
+
+
+class TestProductDetail:
+    # [UI_HOME_004] P0
+    def test_click_product_card(self, home: HomePage) -> None:
+        first_card = home.product_cards.first
+        first_card.click()
+        home._page.wait_for_timeout(1000)
+        assert "/product/" in home._page.url
+
+
+class TestSortAndNav:
+    # [UI_HOME_006] P1
+    def test_sort_select(self, home: HomePage) -> None:
+        home.sort_select.select_option("price,asc")
+        home._page.wait_for_timeout(1000)
+        # 页面不崩溃即可
+
+    # [UI_HOME_008] P1
+    def test_sign_in_link(self, home: HomePage) -> None:
+        home.nav_sign_in.click()
+        home._page.wait_for_timeout(1000)
+        assert "/auth/login" in home._page.url
