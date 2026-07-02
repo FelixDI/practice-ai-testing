@@ -607,20 +607,24 @@ class TestPrivilegeEscalation:
 
     # [API_USER_068] P3
     def test_token_expired_change_password(self, authenticated_user: dict[str, Any]) -> None:
-        c: UserClient = authenticated_user["client"]
-        c.clear_token()
-        r = c.post("/users/change-password", json={
-            "current_password": "Str0ng!Pass",
-            "new_password": "NewStr0ng!Pass",
-            "new_password_confirmation": "NewStr0ng!Pass",
-        })
-        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+        """Token 过期后修改密码——不污染 authenticated_user 夹具。"""
+        with UserClient() as uc:
+            uc.login(authenticated_user["email"], authenticated_user["password"])
+            uc.clear_token()
+            r = uc.post("/users/change-password", json={
+                "current_password": "Str0ng!Pass",
+                "new_password": "NewStr0ng!Pass",
+                "new_password_confirmation": "NewStr0ng!Pass",
+            })
+            assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
     # [API_USER_069] P3
     def test_token_expired_refresh(self, authenticated_user: dict[str, Any]) -> None:
-        c: UserClient = authenticated_user["client"]
-        c.clear_token()
-        r = c.get("/users/refresh")
-        assert r.status_code in (401, 500), f"期望401或500, 实际{r.status_code}"
+        """Token 过期后刷新——不污染 authenticated_user 夹具。"""
+        with UserClient() as uc:
+            uc.login(authenticated_user["email"], authenticated_user["password"])
+            uc.clear_token()
+            r = uc.get("/users/refresh")
+            assert r.status_code in (401, 500), f"期望401或500, 实际{r.status_code}"
 
 # AI-assisted

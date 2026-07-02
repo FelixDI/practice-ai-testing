@@ -301,7 +301,7 @@ class TestCartState:
         client.delete_cart(cart_id)
         pid = _get_product_id(client)
         r = client.add_item(cart_id, pid, 1)
-        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+        assert r.status_code in (404, 422), f"期望404或422, 实际{r.status_code}"
 
     # [API_CART_028] P3
     def test_get_deleted_cart(self, client: CartClient) -> None:

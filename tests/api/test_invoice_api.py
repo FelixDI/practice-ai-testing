@@ -677,19 +677,23 @@ class TestInvoiceDefense:
 
     # [API_INVOICE_062] P3
     def test_token_expired_create(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
-        uc.clear_token()
-        r = uc.post("/invoices", json={
-            **BILLING, "payment_method": "cash-on-delivery",
-            "payment_details": {}, "cart_id": "fake-cart-id",
-        })
-        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+        """Token 过期后创建订单——使用独立客户端，不污染 _mod_auth。"""
+        with UserClient() as uc:
+            uc.login(_mod_auth["email"], _mod_auth["password"])
+            uc.clear_token()
+            r = uc.post("/invoices", json={
+                **BILLING, "payment_method": "cash-on-delivery",
+                "payment_details": {}, "cart_id": "fake-cart-id",
+            })
+            assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
     # [API_INVOICE_063] P3
     def test_token_expired_update_status(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
-        uc.clear_token()
-        r = uc.put("/invoices/fake-id/status", json={"status": "SHIPPED"})
-        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+        """Token 过期后更新状态——使用独立客户端，不污染 _mod_auth。"""
+        with UserClient() as uc:
+            uc.login(_mod_auth["email"], _mod_auth["password"])
+            uc.clear_token()
+            r = uc.put("/invoices/fake-id/status", json={"status": "SHIPPED"})
+            assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
 # AI-assisted
