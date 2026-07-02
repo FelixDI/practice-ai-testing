@@ -16,21 +16,24 @@ Toolshop 电商系统
 practice-ai-testing/
 ├── docs/
 │   ├── test-cases/
-│   │   ├── brand.md
-│   │   ├── cart.md
-│   │   ├── category.md
-│   │   ├── contact.md
-│   │   ├── favorite.md
-│   │   ├── home_page.md
-│   │   ├── image.md
-│   │   ├── invoice.md
-│   │   ├── payment.md
-│   │   ├── postcode.md
-│   │   ├── product-spec.md
-│   │   ├── product.md
-│   │   ├── report.md
-│   │   ├── totp.md
-│   │   └── user.md
+│   │   ├── api/
+│   │   │   ├── brand.md
+│   │   │   ├── cart.md
+│   │   │   ├── category.md
+│   │   │   ├── contact.md
+│   │   │   ├── favorite.md
+│   │   │   ├── image.md
+│   │   │   ├── invoice.md
+│   │   │   ├── payment.md
+│   │   │   ├── postcode.md
+│   │   │   ├── product-spec.md
+│   │   │   ├── product.md
+│   │   │   ├── report.md
+│   │   │   ├── totp.md
+│   │   │   └── user.md
+│   │   ├── integration/
+│   │   └── ui/
+│   │       └── home_page.md
 │   ├── AI 辅助自动化测试开发 全阶段踩坑.md
 │   └── practice_software_testing_api.json
 ├── src/
@@ -95,7 +98,7 @@ practice-ai-testing/
 ├── update_tree.py
 └── uv.lock
 
-13 directories, 68 files
+16 directories, 68 files
 ```
 <!-- PROJECT_STRUCTURE_END -->
 
@@ -103,3 +106,8 @@ practice-ai-testing/
 
 #### API test:
 [Allure测试报告](https://felixdi.github.io/practice-ai-testing/api-allure-report/)
+
+
+
+#### UI test:
+[Allure测试报告](https://felixdi.github.io/practice-ai-testing/ui-allure-report/)
