@@ -31,16 +31,13 @@ class TestSearch:
     # [UI_HOME_002] P0
     def test_search_hammer(self, home: HomePage) -> None:
         home.search("hammer")
-        home._page.wait_for_timeout(1000)
-        cards = home.product_cards
-        assert cards.count() > 0, "搜索 hammer 应有结果"
+        expect(home.product_cards.first).to_be_visible(timeout=10000)
 
     # [UI_HOME_005] P1
     def test_empty_search(self, home: HomePage) -> None:
-        before = home.product_cards.count()
         home.search("")
         home._page.wait_for_timeout(500)
-        assert home._page.url == "https://practicesoftwaretesting.com/" or "/" in home._page.url
+        expect(home.notification_bar).to_be_visible()  # 页面不崩溃即可
 
 
 class TestCategoryNavigation:
