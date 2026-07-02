@@ -49,7 +49,39 @@ docs/
 3. 测试脚本生成——基于用例编写 Pytest
 4. 执行校验——`pytest` 运行，分析失败
 5. 缺陷修复——区分测试 Bug 还是环境问题
-6. 确认覆盖完整后进入下一模块
+6. 当前层级（P0+P1 / P2 / P3）用例全部生成且 pytest 全绿后，按 Git 提交规范推送
+
+## Git 提交规范
+
+### Commit Message 格式
+
+```
+<type>: <中文简述>
+
+- 具体变更 1
+- 具体变更 2
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+```
+
+### Type 定义
+
+| Type | 用途 | 示例 |
+|------|------|------|
+| `feat` | 新功能、新模块 | `feat: Favorite 模块 API 测试全覆盖` |
+| `fix` | Bug 修复 | `fix: CI 409冲突 - 未登录POST 改用动态唯一slug` |
+| `docs` | 文档变更 | `docs: CLAUDE.md 全面优化` |
+| `chore` | 依赖、配置 | `chore: add pyotp` |
+| `refactor` | 重构（不改变行为） | `refactor: 夹具作用域分层决策` |
+
+### 规则
+
+- **小步提交**：每个独立功能/修复完成后立即提交，禁止攒一堆再推
+- **首行 ≤72 字符**：中文按 2 字符=1 英文折算
+- 每行 `-` 开头的项目列表具体说明变更内容
+- **禁止** `WIP`、`tmp`、`fix bug` 等模糊描述
+- **禁止** 提交包含 `pytest.skip` 的临时规避代码（除非已按夹具容错规范走完重试流程）
+- 所有 AI 生成的 commit 必须带尾缀
 
 ## 文档与脚本对应
 
@@ -375,8 +407,6 @@ time.sleep(2)                                           # 用 expect 等待
 | 5 | **商品 ID 数据竞争** | 添加商品到购物车返回 422 "product id is invalid" | 遍历前 5 个商品，找到一个能成功添加的 |
 | 6 | **OpenAPI 文档 ≠ 实际行为** | 文档说 400，实际 422；文档说 404，实际 204 | 以实测为准，代码里 `assert status_code in (X, Y)` 弹性断言 |
 | 7 | **同一账号多测试文件共享** | `customer@practicesoftwaretesting.com` 被多个文件同时用 | 只读操作用固定账号；写操作注册独立账号 |
-
----
 
 ## Agent 规范（占位，待多 Agent 工作流启用后补充）
 
