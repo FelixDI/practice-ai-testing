@@ -1,7 +1,7 @@
 # practice-ai-testing 项目开发规范
 
 ## 项目概述
-- 定位：Toolshop 电商系统全流程 AI 辅助自动化测试项目
+- 定位：AI-Driven Test Automation Framework
 - 被测对象：Practice Software Testing（Toolshop），一个手工具电商演示系统
   - UI 地址：https://practicesoftwaretesting.com
   - Swagger接口文档：https://api.practicesoftwaretesting.com/api/documentation
@@ -186,6 +186,38 @@ docs/
 #### 与 skip 机制联动
 - 自动重试 2 次全部失败，且属于环境类异常时，夹具层可执行 `pytest.skip` 兜底
 - 业务逻辑类失败不触发重试、不允许跳过，必须定位根因并修复
+
+## OpenAPI 文档使用原则（Context 管理）
+
+项目内 `CLAUDE.md` 已维护 API 资源速览、开发流程、测试规范等长期知识。AI 应**优先复用已有上下文**，避免每次重新解析 OpenAPI 文档浪费 token。
+
+### 决策流程
+
+```
+需要接口细节？
+├── 否 → 复用 CLAUDE.md / 已有测试代码 / 记忆
+└── 是 → 按需读取 docs/practice_software_testing_api.json
+         └── 仅读取当前模块相关 paths + components/schemas，不全量加载
+```
+
+### 必须读取 OpenAPI 的场景
+
+- 设计新模块测试用例（确认端点、参数、Schema）
+- 编写 API Client（确认 Path、Method、Request Body、Response）
+- 校验字段约束、枚举值、状态码
+- 接口文档更新后重新同步
+
+### 无需读取 OpenAPI 的场景
+
+- 修改已有测试代码（断言、fixture、参数）
+- 修复测试失败
+- 调整 CI/CD、conftest、公共工具
+- 修改 UI 页面对象
+- 补充 P2/P3 用例（字段边界已在用例文档中记录）
+
+> **核心原则**：CLAUDE.md 中的 API 资源模块速览（下方）覆盖了 14 个模块的全部端点和依赖关系。只有在需要具体 Schema 细节时才读 OpenAPI。
+
+---
 
 ## API 资源模块速览（Toolshop API v5.0.0，14 个模块）
 
