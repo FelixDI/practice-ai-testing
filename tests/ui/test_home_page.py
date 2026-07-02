@@ -15,7 +15,7 @@ from src.ui.pages.home_page import HomePage
 def home(page: Page) -> HomePage:
     hp = HomePage(page)
     hp.goto()
-    page.wait_for_timeout(1000)  # SPA 渲染
+    page.wait_for_selector("[data-test=nav-home]", timeout=15000)
     return hp
 
 
