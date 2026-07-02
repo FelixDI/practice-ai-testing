@@ -68,6 +68,8 @@
 |------|:--:|------|------|------|------|
 | API_CART_025 | P2 | product_id 为空字符串 | 已创建 cart | `POST /carts/{cart_id}`，product_id = `""` | HTTP 422 |
 | API_CART_026 | P3 | 更新已移除商品的数量 | cart 中有商品 A→已移除 | `PUT /carts/{cart_id}/product/quantity`，product_id = A | HTTP 404 |
+| API_CART_027 | P3 | 已删除 cart 后尝试加商品 | cart 已删除 | `POST /carts/{deleted_cart_id}`，传入合法 product_id + quantity | HTTP 404 |
+| API_CART_028 | P3 | 已删除 cart 后尝试获取 | cart 已删除 | `GET /carts/{deleted_cart_id}` | HTTP 404 |
 
 ---
 

@@ -75,7 +75,7 @@
 
 | 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
 |------|:--:|------|------|------|:--:|------|
-| API_PRODUCT_029 | P1 | 删除商品 | 创建测试商品 | `DELETE /products/{id}` | HTTP 204 或 401；删除成功后 `GET /products/{id}` → 404 |
+| API_PRODUCT_029 | P0 | 删除商品 | 创建测试商品 | `DELETE /products/{id}` | HTTP 204 或 401；删除成功后 `GET /products/{id}` → 404 |
 | API_PRODUCT_030 | P1 | 删除不存在的商品 | 无 | `DELETE /products/nonexistent-id-99999` | HTTP 404 或 401 |
 | API_PRODUCT_031 | P3 | 重复删除同一商品 | 已删除一次 | 再次 `DELETE /products/{id}` | HTTP 404 或 401 |
 
@@ -107,6 +107,14 @@
 | API_PRODUCT_043 | P1 | 未登录全量更新商品 | 无 | `PUT /products/{id}`，无 Token | HTTP 401 |
 | API_PRODUCT_044 | P1 | 未登录部分更新商品 | 无 | `PATCH /products/{id}`，无 Token | HTTP 401 |
 | API_PRODUCT_045 | P1 | 未登录删除商品 | 无 | `DELETE /products/{id}`，无 Token | HTTP 401 |
+
+### 1.11 P3 深度防御补充
+
+| 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
+|------|:--:|------|------|------|:--:|------|
+| API_PRODUCT_049 | P3 | description 含 XSS 片段 | 已知 brand_id、category_id | `POST /products`，description = `"<script>alert(1)</script>"` | HTTP 200/201（应转义，不应执行脚本） |
+| API_PRODUCT_050 | P3 | Token 过期后更新商品 | 创建商品→token 失效 | `PUT /products/{id}`，带过期 Token | HTTP 401 |
+| API_PRODUCT_051 | P3 | Token 过期后删除商品 | 创建商品→token 失效 | `DELETE /products/{id}`，带过期 Token | HTTP 401 |
 
 ## 覆盖统计（Product）
 

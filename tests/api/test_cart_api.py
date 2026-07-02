@@ -295,4 +295,19 @@ class TestCartState:
         r = client.update_quantity(cart_id, pid, 1)
         assert r.status_code in (200, 404, 422), f"意外: {r.status_code}"
 
+    # [API_CART_027] P3
+    def test_add_to_deleted_cart(self, client: CartClient) -> None:
+        cart_id = _create_cart(client)
+        client.delete_cart(cart_id)
+        pid = _get_product_id(client)
+        r = client.add_item(cart_id, pid, 1)
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+
+    # [API_CART_028] P3
+    def test_get_deleted_cart(self, client: CartClient) -> None:
+        cart_id = _create_cart(client)
+        client.delete_cart(cart_id)
+        r = client.get_cart(cart_id)
+        assert r.status_code == 404, f"期望404, 实际{r.status_code}"
+
 # AI-assisted

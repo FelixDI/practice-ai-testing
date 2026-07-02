@@ -1,6 +1,6 @@
 """Product 模块 API 测试。
 
-蓝图：docs/test-cases/product.md —— 48 条用例，8 个端点全覆盖。
+蓝图：docs/test-cases/product.md —— 51 条用例，8 个端点全覆盖。
 """
 
 from __future__ import annotations
@@ -11,6 +11,8 @@ from typing import Any
 import pytest
 
 from src.api.client.product_client import ProductClient
+from src.api.client.user_client import UserClient
+from src.common.config import TEST_USER_EMAIL, TEST_USER_PASSWORD
 
 
 # -- module 级夹具 --------------------------------------------------------
@@ -504,5 +506,46 @@ class TestProductAuth:
     def test_delete_unauthenticated_401(self) -> None:
         r = ProductClient().delete("/products/some-id")
         assert r.status_code in (401, 404, 422), f"意外: {r.status_code}"
+
+
+class TestProductDefense:
+    """P3 深度防御。"""
+
+    @pytest.fixture
+    def _auth_product(self) -> ProductClient:
+        """function 级：已认证 ProductClient（token 过期测试用）。"""
+        with UserClient() as uc:
+            uc.login(TEST_USER_EMAIL, TEST_USER_PASSWORD)
+            token = uc.token
+        pc = ProductClient()
+        pc.set_token(token)
+        yield pc
+        pc.close()
+
+    # [API_PRODUCT_049] P3
+    def test_xss_description(
+        self, client: ProductClient, _mod_create_ctx: dict[str, Any],
+    ) -> None:
+        r = client.post("/products", json={
+            "name": f"XSS-Test-{uuid.uuid4().hex[:6]}",
+            "description": "<script>alert(1)</script>",
+            "price": 9.99,
+            "is_location_offer": True,
+            "is_rental": False,
+            **_mod_create_ctx,
+        })
+        assert r.status_code in (200, 201), f"期望200/201（应转义）, 实际{r.status_code} {r.text}"
+
+    # [API_PRODUCT_050] P3
+    def test_token_expired_put(self, _auth_product: ProductClient) -> None:
+        _auth_product.clear_token()
+        r = _auth_product.put("/products/some-id", json={"name": "X"})
+        assert r.status_code in (401, 404), f"期望401或404, 实际{r.status_code}"
+
+    # [API_PRODUCT_051] P3
+    def test_token_expired_delete(self, _auth_product: ProductClient) -> None:
+        _auth_product.clear_token()
+        r = _auth_product.delete("/products/some-id")
+        assert r.status_code in (401, 404), f"期望401或404, 实际{r.status_code}"
 
 # AI-assisted

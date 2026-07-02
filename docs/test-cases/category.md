@@ -63,7 +63,7 @@
 
 | 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
 |------|:--:|------|------|------|:--:|------|
-| API_CATEGORY_020 | P1 | 删除分类 | 创建测试分类 | `DELETE /categories/{id}` | HTTP 204；随后 `GET /categories/tree/{id}` → 404 |
+| API_CATEGORY_020 | P0 | 删除分类 | 创建测试分类 | `DELETE /categories/{id}` | HTTP 204；随后 `GET /categories/tree/{id}` → 404 |
 | API_CATEGORY_021 | P1 | 删除不存在的分类 | 无 | `DELETE /categories/nonexistent-id-99999` | HTTP 404 或 422 |
 | API_CATEGORY_022 | P3 | 重复删除 | 已删除一次 | 再次 `DELETE /categories/{id}` | HTTP 404 |
 
@@ -84,6 +84,15 @@
 |------|:--:|------|------|------|:--:|------|
 | API_CATEGORY_029 | P1 | 未登录全量更新分类 | 无 | `PUT /categories/{id}`，无 Token | HTTP 401 |
 | API_CATEGORY_030 | P1 | 未登录部分更新分类 | 无 | `PATCH /categories/{id}`，无 Token | HTTP 401 |
+| API_CATEGORY_031 | P1 | 未登录创建分类 | 无 | `POST /categories`，无 Token | HTTP 401 |
+| API_CATEGORY_032 | P1 | 未登录删除分类 | 无 | `DELETE /categories/{id}`，无 Token | HTTP 401 |
+
+### 3.11 P2 字段边界补充
+
+| 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
+|------|:--:|------|------|------|:--:|------|
+| API_CATEGORY_033 | P2 | name 超长 | 无 | `POST /categories`，name 传入 256 字符 | HTTP 422 |
+| API_CATEGORY_034 | P2 | slug 超长 | 无 | `POST /categories`，slug 传入 256 字符 | HTTP 422 |
 
 ---
 

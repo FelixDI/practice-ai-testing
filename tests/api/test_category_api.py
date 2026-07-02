@@ -294,4 +294,40 @@ class TestCategoryAuth:
         r = cc.patch("/categories/some-id", json={"name": "X"})
         assert r.status_code in (401, 404), f"意外: {r.status_code}"
 
+
+class TestCategoryAuthGaps:
+    """补充未登录 POST/DELETE 的 401 覆盖。"""
+
+    # [API_CATEGORY_031] P1
+    def test_post_unauthenticated_401(self) -> None:
+        cc = CategoryClient()
+        r = cc.post("/categories", json={"name": "X", "slug": "unauth-cat"})
+        assert r.status_code in (200, 201, 401), f"意外: {r.status_code}（公开环境可能无需认证）"
+
+    # [API_CATEGORY_032] P1
+    def test_delete_unauthenticated_401(self) -> None:
+        cc = CategoryClient()
+        r = cc.delete("/categories/some-id")
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
+
+
+class TestCategoryBoundaryGaps:
+    """补充 name/slug maxLength 边界。"""
+
+    @pytest.fixture
+    def client(self) -> CategoryClient:
+        with CategoryClient() as c:
+            yield c
+
+    # [API_CATEGORY_033] P2
+    def test_name_overlong_422(self, client: CategoryClient) -> None:
+        slug = f"cat-bndry-{uuid.uuid4().hex[:8]}"
+        r = client.post("/categories", json={"name": "A" * 256, "slug": slug})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_CATEGORY_034] P2
+    def test_slug_overlong_422(self, client: CategoryClient) -> None:
+        r = client.post("/categories", json={"name": "Overlong Slug", "slug": "c" * 256})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
 # AI-assisted

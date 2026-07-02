@@ -246,6 +246,16 @@ class TestLogin:
         r = user_client.post("/users/login", json={})
         assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
+    # [API_USER_066] P2
+    def test_password_too_short_401(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/login", json={"email": "x@x.com", "password": "12345"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+
+    # [API_USER_067] P2
+    def test_email_invalid_format_401(self, user_client: UserClient) -> None:
+        r = user_client.post("/users/login", json={"email": "not-an-email", "password": "Str0ng!Pass"})
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+
 
 # ======================================================================
 # 1.3 获取当前用户（3 条）── API_USER_024 ~ API_USER_026
@@ -594,5 +604,23 @@ class TestPrivilegeEscalation:
         else:
             # API doesn't allow self-delete (403), skip verification
             assert r.status_code == 403, f"意外: {r.status_code}"
+
+    # [API_USER_068] P3
+    def test_token_expired_change_password(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        c.clear_token()
+        r = c.post("/users/change-password", json={
+            "current_password": "Str0ng!Pass",
+            "new_password": "NewStr0ng!Pass",
+            "new_password_confirmation": "NewStr0ng!Pass",
+        })
+        assert r.status_code == 401, f"期望401, 实际{r.status_code}"
+
+    # [API_USER_069] P3
+    def test_token_expired_refresh(self, authenticated_user: dict[str, Any]) -> None:
+        c: UserClient = authenticated_user["client"]
+        c.clear_token()
+        r = c.get("/users/refresh")
+        assert r.status_code in (401, 500), f"期望401或500, 实际{r.status_code}"
 
 # AI-assisted

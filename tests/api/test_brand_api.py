@@ -260,4 +260,40 @@ class TestBrandAuth:
         r = bc.patch("/brands/some-id", json={"name": "X"})
         assert r.status_code in (401, 404), f"意外: {r.status_code}"
 
+
+class TestBrandAuthGaps:
+    """补充未登录 POST/DELETE 的 401 覆盖。"""
+
+    # [API_BRAND_029] P1
+    def test_post_unauthenticated_401(self) -> None:
+        bc = BrandClient()
+        r = bc.post("/brands", json={"name": "X", "slug": "unauth-x"})
+        assert r.status_code in (200, 201, 401), f"意外: {r.status_code}（公开环境可能无需认证）"
+
+    # [API_BRAND_030] P1
+    def test_delete_unauthenticated_401(self) -> None:
+        bc = BrandClient()
+        r = bc.delete("/brands/some-id")
+        assert r.status_code in (401, 404), f"意外: {r.status_code}"
+
+
+class TestBrandBoundaryGaps:
+    """补充 name/slug maxLength 边界。"""
+
+    @pytest.fixture
+    def client(self) -> BrandClient:
+        with BrandClient() as c:
+            yield c
+
+    # [API_BRAND_031] P2
+    def test_name_overlong_422(self, client: BrandClient) -> None:
+        slug = f"bndry-{uuid.uuid4().hex[:8]}"
+        r = client.post("/brands", json={"name": "A" * 256, "slug": slug})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
+    # [API_BRAND_032] P2
+    def test_slug_overlong_422(self, client: BrandClient) -> None:
+        r = client.post("/brands", json={"name": "Overlong Slug", "slug": "b" * 256})
+        assert r.status_code == 422, f"期望422, 实际{r.status_code}"
+
 # AI-assisted

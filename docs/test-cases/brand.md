@@ -49,7 +49,7 @@
 
 | 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
 |------|:--:|------|------|------|:--:|------|
-| API_BRAND_016 | P1 | 删除品牌 | 无 | `DELETE /brands/{id}` | HTTP 204；随后 `GET /brands/{id}` → 404 |
+| API_BRAND_016 | P0 | 删除品牌 | 创建测试品牌 | `DELETE /brands/{id}` | HTTP 204；随后 `GET /brands/{id}` → 404 |
 | API_BRAND_017 | P1 | 删除不存在的品牌 | 无 | `DELETE /brands/nonexistent-id-99999` | HTTP 404 或 422 |
 | API_BRAND_018 | P3 | 重复删除同一品牌 | 已删除一次 | 再次 `DELETE /brands/{id}` | HTTP 404 |
 
@@ -77,6 +77,15 @@
 |------|:--:|------|------|------|:--:|------|
 | API_BRAND_027 | P1 | 未登录全量更新品牌 | 无 | `PUT /brands/{id}`，无 Token | HTTP 401 |
 | API_BRAND_028 | P1 | 未登录部分更新品牌 | 无 | `PATCH /brands/{id}`，无 Token | HTTP 401 |
+| API_BRAND_029 | P1 | 未登录创建品牌 | 无 | `POST /brands`，无 Token | HTTP 401 |
+| API_BRAND_030 | P1 | 未登录删除品牌 | 无 | `DELETE /brands/{id}`，无 Token | HTTP 401 |
+
+### 2.10 P2 字段边界补充
+
+| 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
+|------|:--:|------|------|------|:--:|------|
+| API_BRAND_031 | P2 | name 超长 | 无 | `POST /brands`，name 传入 256 字符 | HTTP 422 |
+| API_BRAND_032 | P2 | slug 超长 | 无 | `POST /brands`，slug 传入 256 字符 | HTTP 422 |
 
 ---
 

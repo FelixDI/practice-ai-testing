@@ -9,7 +9,7 @@
 
 | 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
 |------|:--:|------|------|------|:--:|------|
-| API_USER_001 | P1 | 完整合法数据注册 | 无 | `POST /users/register`，传入合法 first_name、last_name、email、password、address(street/city/country/postal_code)、dob | HTTP 201；响应含 id、email、first_name、last_name、created_at |
+| API_USER_001 | P0 | 完整合法数据注册 | 无 | `POST /users/register`，传入合法 first_name、last_name、email、password、address(street/city/country/postal_code)、dob | HTTP 201；响应含 id、email、first_name、last_name、created_at |
 | API_USER_002 | P1 | 重复邮箱注册 | 已注册邮箱 | 使用相同邮箱再次注册 | HTTP 409 Conflict |
 | API_USER_003 | P1 | 缺少 first_name | 无 | 请求体中不传 first_name | HTTP 422 |
 | API_USER_004 | P1 | 缺少 last_name | 无 | 请求体中不传 last_name | HTTP 422 |
@@ -43,6 +43,8 @@
 | API_USER_021 | P1 | 缺少 email 字段 | 无 | 只传 password | HTTP 401 |
 | API_USER_022 | P1 | 缺少 password 字段 | 无 | 只传 email | HTTP 401 |
 | API_USER_023 | P1 | 空请求体 | 无 | 发送 `{}` | HTTP 401 |
+| API_USER_066 | P2 | 密码不足 6 位（登录） | 已注册用户 | `POST /users/login`，password 传入 5 位 | HTTP 401 |
+| API_USER_067 | P2 | 邮箱格式非法（登录） | 无 | `POST /users/login`，email = `"not-an-email"` | HTTP 401 |
 
 ### 1.3 获取当前用户 · GET /users/me
 
@@ -139,6 +141,8 @@
 | API_USER_063 | P3 | 用户 A 的 Token 操作用户 B 的数据（横向越权） | 注册用户 A + 用户 B，A 登录 | 使用 A 的 Token 执行 `PUT /users/{B_id}` | HTTP 403 |
 | API_USER_064 | P3 | 用户 A 删除用户 B（横向越权） | 同上 | 使用 A 的 Token 执行 `DELETE /users/{B_id}` | HTTP 403 |
 | API_USER_065 | P3 | 被删除用户的资源再次操作 | 用户已注册→登录→删除本人 | `GET /users/{deleted_id}` | HTTP 404 |
+| API_USER_068 | P3 | Token 过期后修改密码 | 已登录→token 失效 | `POST /users/change-password`，带过期 Token | HTTP 401 |
+| API_USER_069 | P3 | Token 过期后刷新 | 已登录→token 失效 | `GET /users/refresh`，带过期 Token | HTTP 401 |
 
 ---
 

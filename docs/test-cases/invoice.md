@@ -150,6 +150,9 @@
 | 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
 |------|:--:|------|------|------|------|
 | API_INVOICE_049 | P3 | 用户 A 查看用户 B 的订单（横向越权） | 注册 A 和 B，A 创建订单，B 登录 | B 的 Token 访问 `GET /invoices/{A_order_id}` | HTTP 403 或 404 |
+| API_INVOICE_061 | P3 | billing_street 含 XSS 片段 | 已登录、已创建 cart | `POST /invoices`，billing_street = `"<script>alert(1)</script>"` | HTTP 200 或 422（应转义） |
+| API_INVOICE_062 | P3 | Token 过期后创建订单 | 已登录→token 失效 | `POST /invoices`，带过期 Token | HTTP 401 |
+| API_INVOICE_063 | P3 | Token 过期后更新订单状态 | 已登录→token 失效 | `PUT /invoices/{id}/status`，带过期 Token | HTTP 401 |
 
 ---
 
