@@ -383,8 +383,12 @@ slug = f"test-{uuid.uuid4().hex[:8]}"
 # ❌ 禁止硬编码
 url = "https://api.practicesoftwaretesting.com/brands"  # 走 config
 time.sleep(2)                                           # 用 expect 等待
+
+# ❌ 禁止硬编码 venv 路径
+PYTEST = str(PROJECT_ROOT / ".venv" / "bin" / "pytest")  # 跨平台炸
 ```
 
+- **运行命令统一走 `uv run`**：`uv run pytest`、`uv run python`，**禁止**直接调用 `.venv/bin/python` 或硬编码 venv 路径（跨平台不兼容）
 - 测试文件：`test_{module}_api.py`，函数：`test_{场景描述}`，类：`Test{模块名}`
 - 公共能力封装到 `src/`，不放在 `tests/` 下
 - 遵循 PEP8，命名语义化

@@ -24,7 +24,6 @@ from mcp.server.fastmcp import FastMCP
 # --------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PYTEST = PROJECT_ROOT / ".venv" / "bin" / "pytest"
 
 mcp = FastMCP("pytest-runner")
 
@@ -70,7 +69,7 @@ def run(args: list[str]) -> dict:
     """执行 pytest。"""
 
     cmd = [
-        str(PYTEST),
+        "uv", "run", "pytest",
         "-q",
         "--tb=line",
         "--no-header",
