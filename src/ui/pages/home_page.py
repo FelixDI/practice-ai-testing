@@ -17,7 +17,7 @@ class HomePage:
     # -- Navigation -------------------------------------------------------
 
     def goto(self) -> None:
-        self._page.goto("/", wait_until="domcontentloaded")
+        self._page.goto("https://practicesoftwaretesting.com/", wait_until="domcontentloaded")
 
     @property
     def title(self) -> str:
