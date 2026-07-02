@@ -66,7 +66,7 @@ class HomePage:
 
     @property
     def product_cards(self) -> Locator:
-        return self._page.locator("a[href*='product']")
+        return self._page.locator("a[href*='/product/']")
 
     @property
     def notification_bar(self) -> Locator:

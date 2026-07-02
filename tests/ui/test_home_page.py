@@ -24,7 +24,7 @@ class TestHomePageLoad:
     def test_page_loads_with_products(self, home: HomePage) -> None:
         expect(home.notification_bar).to_be_visible()
         assert "Practice Software Testing" in home.title
-        assert home.product_cards.count() > 0, "首页应有商品卡片"
+        expect(home.product_cards.first).to_be_visible(timeout=10000)
 
 
 class TestSearch:
