@@ -355,6 +355,8 @@ src/ui/
 | **Tests** | push/PR 到 main（`src/` `tests/` `pyproject.toml` `uv.lock` 变更） | API + UI 并行测试 |
 | **Deploy Allure** | Tests 完成（仅 success） | 生成 API/UI Allure HTML → 发布 GitHub Pages |
 
+> **已知限制**：`practicesoftwaretesting.com` 启用了 Cloudflare 反爬保护，GitHub Actions Runner 可能被拦截（返回 403 或 Cloudflare 挑战页）。CI 已配置 `Check site reachability` 步骤自动检测并跳过 UI 测试。UI 测试以本地执行为准。
+
 ### CI 失败处理
 
 **🚨 本地通过 + CI 失败 = 先排查环境，再怀疑代码。**
