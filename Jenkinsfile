@@ -39,6 +39,7 @@ pipeline {
             when { expression { env.SKIP_TESTS != 'true' } }
             steps {
                 sh '''
+                    apt-get update -qq && apt-get install -y -qq wget > /dev/null
                     curl -LsSf https://astral.sh/uv/install.sh | sh
                     uv sync
                 '''
