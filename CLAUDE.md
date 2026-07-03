@@ -26,9 +26,9 @@ src/
   common/            # 配置、日志、通用工具
 tests/
   ui/                # UI 测试
-  api/               # API 测试
+  api/               # API 测试（含 conftest.py，夹具仅供 API 层使用）
   integration/       # 全链路集成测试
-  conftest.py        # 全局 fixture
+  conftest.py        # 跨测试类型共享的工具（仅 generate_unique_email）
 docs/
   test-cases/
     api/             # API 测试用例设计文档

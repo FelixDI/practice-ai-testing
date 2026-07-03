@@ -130,8 +130,5 @@ class TestLoggedInState:
     # [UI_HOME_013] P3
     def test_logged_in_nav_has_favorites(self, logged_in_home: HomePage) -> None:
         logged_in_home._page.locator("[data-test=nav-menu]").click()
-        sign_out = logged_in_home._page.locator("[data-test=nav-sign-out]")
-        expect(sign_out).to_be_visible(timeout=5000)
-
-        fav = logged_in_home._page.locator("[data-test=nav-my-favorites]")
-        expect(fav).to_be_visible(timeout=5000)
+        expect(logged_in_home._page.locator("[data-test=nav-sign-out]")).to_be_visible(timeout=5000)
+        expect(logged_in_home._page.locator("[data-test=nav-my-favorites]")).to_be_visible(timeout=5000)
