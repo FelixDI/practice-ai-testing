@@ -228,6 +228,7 @@ src/ui/
 - 定位优先级：`data-test` > `get_by_role` > `get_by_text`
 - **禁止** 绝对 XPath、脆弱 CSS 选择器
 - **禁止** `time.sleep()`，用 Playwright 自动等待或 `expect` 条件等待
+- **禁止** `page.wait_for_timeout()` 固定等待（本地碰巧够，CI 全炸）。必须使用 `expect()`、`wait_for_url()`、`expect_navigation()`、`wait_for_selector()` 等显式等待
 - 断言统一使用 `expect`
 
 ### 页面对象清单（基于 Toolshop 实测导航）
