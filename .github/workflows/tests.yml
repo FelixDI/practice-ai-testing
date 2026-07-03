@@ -97,7 +97,7 @@ jobs:
         run: uv sync
 
       - name: Install Playwright Chromium
-        run: uv run playwright install chromium
+        run: uv run playwright install --with-deps chromium
 
       - name: Run UI Tests
         run: |
