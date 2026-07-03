@@ -356,10 +356,20 @@ src/ui/
 
 ### CI 失败处理
 
-1. 去 Actions 页面看 `junit.xml`（Artifacts）定位失败用例
+**🚨 本地通过 + CI 失败 = 先排查环境，再怀疑代码。**
+
+| 优先级 | 检查项 | 常见 CI 环境问题 |
+|:--:|------|------|
+| 1 | CI log 完整报错 | 不要只看测试名，看具体错误信息 |
+| 2 | 网络可达性 | CI runner 能否访问被测站点 |
+| 3 | 系统依赖 | Playwright 是否 `--with-deps`、浏览器是否安装 |
+| 4 | 超时/等待策略 | `networkidle` 永远等不到（SPA 长连接）、`wait_for_timeout` 硬编码 |
+| 5 | 最后才怀疑测试代码 | 反复改测试而 CI 一直挂，问题大概率在环境 |
+
+1. 去 Actions 页面看 `junit.xml`（Artifacts）或直接读 CI log
 2. 本地 `pytest tests/api/test_{module}_api.py -v` 复现
-3. 如果是环境波动（500/超时），重跑 CI 即可
-4. 如果是断言失败，修测试代码后推送
+3. 本地通过、CI 失败 → **先对照上表排查环境**，不要改测试代码
+4. 如果是断言失败（本地也挂），修测试代码后推送
 5. Allure 报告地址：`https://felixdi.github.io/practice-ai-testing/api-allure-report/`
 
 ### 首次部署 Pages
