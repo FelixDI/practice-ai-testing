@@ -99,7 +99,25 @@ jobs:
       - name: Install Playwright Chromium
         run: uv run playwright install --with-deps chromium
 
+      - name: Check site reachability
+        id: check
+        run: |
+          STATUS=$(curl -sI -o /dev/null -w "%{http_code}" https://practicesoftwaretesting.com/ --max-time 10)
+          BODY=$(curl -s https://practicesoftwaretesting.com/ --max-time 10 | head -5)
+          echo "HTTP status: $STATUS"
+          if echo "$BODY" | grep -qiE "cloudflare|checking your browser|403.*denied"; then
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+            echo "⚠️ 站点被 Cloudflare 拦截，跳过 UI 测试"
+          elif [ "$STATUS" != "200" ]; then
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+            echo "⚠️ 站点不可达 (HTTP $STATUS)，跳过 UI 测试"
+          else
+            echo "blocked=false" >> "$GITHUB_OUTPUT"
+            echo "✅ 站点可达，运行 UI 测试"
+          fi
+
       - name: Run UI Tests
+        if: steps.check.outputs.blocked != 'true'
         run: |
           uv run pytest tests/ui \
             -v \
