@@ -1,15 +1,8 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.12-slim'
-            args '-v /tmp/.X11-unix:/tmp/.X11-unix'
-        }
-    }
+    agent any
 
     environment {
-        HOME = "${WORKSPACE}"
-        UV_CACHE_DIR = "${WORKSPACE}/.uv-cache"
-        PATH = "${WORKSPACE}/.local/bin:${PATH}"
+        PATH = "${HOME}/.local/bin:${PATH}"
     }
 
     stages {
@@ -46,7 +39,6 @@ pipeline {
             when { expression { env.SKIP_TESTS != 'true' } }
             steps {
                 sh '''
-                    apt-get update -qq && apt-get install -y -qq curl git jq wget > /dev/null
                     curl -LsSf https://astral.sh/uv/install.sh | sh
                     uv sync
                 '''
@@ -100,7 +92,7 @@ pipeline {
 
                     if (blocked == 'ok') {
                         sh '''
-                            uv run playwright install --with-deps chromium
+                            uv run playwright install chromium
                             uv run pytest tests/ui \
                                 -v \
                                 --tb=line \
