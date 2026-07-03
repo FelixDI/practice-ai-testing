@@ -39,7 +39,6 @@ pipeline {
             when { expression { env.SKIP_TESTS != 'true' } }
             steps {
                 sh '''
-                    apt-get update -qq && apt-get install -y -qq wget > /dev/null
                     curl -LsSf https://astral.sh/uv/install.sh | sh
                     uv sync
                 '''
@@ -126,7 +125,7 @@ pipeline {
                         # 安装 Allure CLI
                         ALLURE_VERSION=2.33.0
                         if [ ! -f "allure-${ALLURE_VERSION}.tgz" ]; then
-                            wget -q https://github.com/allure-framework/allure2/releases/download/${ALLURE_VERSION}/allure-${ALLURE_VERSION}.tgz
+                            curl -sLO https://github.com/allure-framework/allure2/releases/download/${ALLURE_VERSION}/allure-${ALLURE_VERSION}.tgz
                             tar -xzf allure-${ALLURE_VERSION}.tgz
                         fi
 
