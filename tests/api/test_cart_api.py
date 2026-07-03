@@ -124,8 +124,14 @@ class TestAddItem:
     # [API_CART_002]
     def test_add_item_200(self, client: CartClient) -> None:
         cart_id = _create_cart(client)
-        pid = _get_product_id(client)
-        r = client.add_item(cart_id, pid, 2)
+        # 遍历前几个商品，规避公开环境商品数据竞争（部分 ID 可能不可加购）
+        for _ in range(3):
+            pid = _get_product_id(client)
+            r = client.add_item(cart_id, pid, 2)
+            if r.status_code == 200:
+                break
+            if r.status_code == 422 and "product id is invalid" in r.text.lower():
+                continue
         assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
 
     # [API_CART_003]
