@@ -44,15 +44,16 @@ docs/
 ## AI 协作开发流程（强制执行）
 
 ```
-需求分析 → 测试用例设计 → 测试脚本生成 → pytest 验证 → 缺陷修复 → 覆盖完整 → 下一模块
+需求分析 → 测试用例设计 → 测试脚本生成 → MCP 浏览器验证 → pytest 验证 → 缺陷修复 → 覆盖完整 → 下一模块
 ```
 
 1. 需求分析——了解业务逻辑和 API 能力
 2. 测试用例设计——输出 MD 至 `docs/test-cases/api/`、`docs/test-cases/ui/` 或 `docs/test-cases/integration/`
 3. 测试脚本生成——基于用例编写 Pytest
-4. 执行校验——`pytest` 运行，分析失败
-5. 缺陷修复——区分测试 Bug 还是环境问题
-6. 当前层级（P0+P1 / P2 / P3）用例全部生成且 pytest 全绿后，按 Git 提交规范推送
+4. **MCP 浏览器验证**——使用 Playwright MCP 打开目标页面，`browser_snapshot` + `browser_evaluate` 批量验证所有 `data-test` 选择器是否存在，禁止提交含不存在选择器的代码（详见 [Playwright MCP 浏览器验证](#playwright-mcp-浏览器验证强制执行)）
+5. 执行校验——`pytest` 运行，分析失败
+6. 缺陷修复——区分测试 Bug 还是环境问题
+7. 当前层级（P0+P1 / P2 / P3）用例全部生成且 pytest 全绿后，按 Git 提交规范推送
 
 ## Git 提交规范
 
@@ -223,6 +224,7 @@ src/ui/
 - **Page**：对应一个路由，负责页面级操作（`goto`、等待加载完成）
 - **Component**：跨页面复用的 UI 片段，Page 通过组合引入 Component，禁止在 Page 中重复实现 Component 已有的逻辑
 - **组件抽象时机**：写完 3~4 个页面后，哪些是真正跨页面复用的组件就清楚了，此时抽象最自然。前期过早抽组件容易过度设计，全部写完再抽重构成本高
+- **MCP 辅助 Component 提取**：决定提取组件前，用 Playwright MCP 打开至少 2 个使用该组件的页面，对比 DOM 确认复用范围。验证通过后再创建 `src/ui/components/{name}.py`，将 Page 中的选择器迁移到 Component，Page 改为组合引用
 
 ### 定位与等待
 
@@ -231,6 +233,53 @@ src/ui/
 - **禁止** `time.sleep()`，用 Playwright 自动等待或 `expect` 条件等待
 - **禁止** `page.wait_for_timeout()` 固定等待（本地碰巧够，CI 全炸）。必须使用 `expect()`、`wait_for_url()`、`expect_navigation()`、`wait_for_selector()` 等显式等待
 - 断言统一使用 `expect`
+
+### Playwright MCP 浏览器验证（强制执行）
+
+Playwright MCP 是 UI 测试开发的**实时纠错手段**——让 AI 直接操作浏览器验证选择器和交互逻辑，而非盲写代码等 pytest 报错。
+
+**触发时机**：
+- 新建或修改 Page Object → 必须用 MCP 打开页面验证所有 `data-test` 选择器
+- 新建或修改 Component → 必须用 MCP 打开至少 2 个使用该组件的页面验证
+- 提取 Component 前 → 用 MCP 浏览多个页面确认复用范围
+- 调试 UI 测试失败 → 用 MCP 复原操作步骤、截图对比
+
+**验证清单**：
+
+| 步骤 | 工具 | 目的 |
+|------|------|------|
+| 1. 打开目标页面 | `browser_navigate` | 加载页面 |
+| 2. 获取 DOM 快照 | `browser_snapshot` | 了解页面结构、语义角色、层级 |
+| 3. 批量检查选择器 | `browser_evaluate` | 验证所有 `data-test` 是否存在 |
+| 4. 截图确认（可选） | `browser_take_screenshot` | 视觉对比、布局确认 |
+| 5. 交互验证（可选） | `browser_click` / `browser_type` | 验证点击、输入后状态变化 |
+
+**`browser_evaluate` 验证模板**：
+
+```js
+() => {
+  const selectors = ['nav-home', 'nav-categories', 'search-query', /* ... */];
+  const results = {};
+  for (const s of selectors) {
+    const el = document.querySelector(`[data-test="${s}"]`);
+    results[s] = el ? el.tagName : 'MISSING';
+  }
+  return results;
+}
+```
+
+**通过标准**：
+- 所有 Page Object 中引用的 `data-test` 选择器必须返回非 `MISSING`
+- 登录态专属选择器必须在登录后单独验证
+- 发现 `MISSING` → 立即修复选择器，**禁止提交含不存在选择器的代码**
+
+**Component 抽取决策**（MCP 辅助）：
+
+| 组件 | 验证方法 | 判定标准 |
+|------|------|------|
+| `Header` | 分别打开 HomePage + LoginPage，执行 `querySelectorAll('[data-test^="nav-"]')` | 两个页面返回的 `data-test` 列表一致 |
+| `Footer` | 同上，检查页脚链接 | 跨页面一致 |
+| `ProductCard` | 打开 HomePage + CategoryPage，检查 `.card` 或 `a[href*="/product/"]` 结构 | DOM 子树结构一致 |
 
 ### 页面对象清单（基于 Toolshop 实测导航）
 
