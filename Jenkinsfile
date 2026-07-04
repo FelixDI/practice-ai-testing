@@ -108,7 +108,11 @@ pipeline {
             post {
                 always {
                     junit 'junit-ui.xml'
-                    archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
+                    archiveArtifacts(
+                        artifacts: 'test-results/**, junit-ui.xml',
+                        allowEmptyArchive: true,
+                        fingerprint: true
+                    )
                 }
             }
         }
