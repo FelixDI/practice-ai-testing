@@ -376,6 +376,10 @@ src/ui/
 4. 如果是断言失败（本地也挂），修测试代码后推送
 5. Allure 报告地址：`https://felixdi.github.io/practice-ai-testing/api-allure-report/`
 
+### Jenkins 凭据作用域
+
+`withCredentials` 在 Pipeline 脚本中读取凭据，Scope **必须选 `Global`（unrestricted）**。选 `System` 仅供给 Jenkins 系统底层（源码管理、邮件服务器等）使用，脚本内 `withCredentials` 读不到。
+
 ### 首次部署 Pages
 
 `gh-pages` 分支由 CI 自动创建。首次推送后去 `Settings → Pages` 选择 `gh-pages` 分支即可。

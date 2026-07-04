@@ -63,12 +63,14 @@ practice-ai-testing/
 │   ├── ui/
 │   │   ├── pages/
 │   │   │   ├── __init__.py
+│   │   │   ├── base_page.py
 │   │   │   └── home_page.py
 │   │   └── __init__.py
 │   └── __init__.py
 ├── tests/
 │   ├── api/
 │   │   ├── __init__.py
+│   │   ├── conftest.py
 │   │   ├── test_brand_api.py
 │   │   ├── test_cart_api.py
 │   │   ├── test_category_api.py
@@ -92,13 +94,14 @@ practice-ai-testing/
 │   ├── __init__.py
 │   └── conftest.py
 ├── CLAUDE.md
+├── Jenkinsfile
 ├── README.md
 ├── main.py
 ├── pyproject.toml
 ├── update_tree.py
 └── uv.lock
 
-16 directories, 68 files
+16 directories, 71 files
 ```
 <!-- PROJECT_STRUCTURE_END -->
 
