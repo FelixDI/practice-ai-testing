@@ -108,6 +108,7 @@ pipeline {
             post {
                 always {
                     junit 'junit-ui.xml'
+                    archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
                 }
             }
         }
