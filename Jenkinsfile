@@ -109,7 +109,7 @@ pipeline {
                 always {
                     junit 'junit-ui.xml'
                     archiveArtifacts(
-                        artifacts: 'test-results/**, junit-ui.xml',
+                        artifacts: 'test-results/**, allure-results-ui/**, junit-ui.xml',
                         allowEmptyArchive: true,
                         fingerprint: true
                     )
