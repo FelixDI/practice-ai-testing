@@ -1,6 +1,6 @@
 """LoginPage 模块 UI 测试。
 
-蓝图：docs/test-cases/login_page.md —— 10 条用例（P0×3 + P1×3 + P2×3 + P3×1）。
+蓝图：docs/test-cases/login_page.md —— 12 条用例（P0×3 + P1×3 + P2×4 + P3×2）。
 """
 
 from __future__ import annotations
@@ -109,6 +109,18 @@ class TestLoginBoundary:
         expect(login_page.email_input).to_have_attribute("aria-invalid", "true", timeout=5000)
         assert "/auth/login" in login_page._page.url
 
+    # [UI_LOGIN_011] P2
+    def test_password_visibility_toggle(self, login_page: LoginPage) -> None:
+        login_page.fill_password("test-password")
+        # 默认隐藏
+        expect(login_page.password_input).to_have_attribute("type", "password")
+        # 点击 eye icon 切换为明文
+        login_page.password_toggle.click()
+        expect(login_page.password_input).to_have_attribute("type", "text")
+        # 再次点击切回密文
+        login_page.password_toggle.click()
+        expect(login_page.password_input).to_have_attribute("type", "password")
+
 
 class TestLoggedInRedirect:
     """P3 已登录状态。"""
@@ -131,5 +143,18 @@ class TestLoggedInRedirect:
         expect(logged_in_page.locator("[data-test=nav-menu]")).to_be_visible(timeout=10000)
         logged_in_page.locator("[data-test=nav-menu]").click()
         expect(logged_in_page.locator("[data-test=nav-sign-out]")).to_be_visible(timeout=5000)
+
+class TestLoginSecurity:
+    """P3 安全注入。"""
+
+    # [UI_LOGIN_012] P3
+    def test_xss_injection_in_email(self, login_page: LoginPage) -> None:
+        login_page.fill_email("<script>alert(1)</script>")
+        login_page.fill_password("any-password-123")
+        login_page.submit()
+        # 前端校验拦截非法邮箱格式；页面不崩溃、不弹窗
+        expect(login_page.email_input).to_have_attribute("aria-invalid", "true", timeout=5000)
+        assert "/auth/login" in login_page._page.url, "XSS 注入不应离开登录页"
+        expect(login_page.login_form).to_be_visible()
 
 # AI-assisted

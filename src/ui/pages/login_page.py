@@ -44,6 +44,13 @@ class LoginPage(BasePage):
     def login_error(self) -> Locator:
         return self._page.locator("[data-test=login-error]")
 
+    # -- 密码可见性 -------------------------------------------------------
+
+    @property
+    def password_toggle(self) -> Locator:
+        """密码框旁的 eye icon 按钮（无 data-test，用 CSS 定位）。"""
+        return self._page.locator("[data-test=password] ~ div button")
+
     # -- 导航链接 ---------------------------------------------------------
 
     @property
