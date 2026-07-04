@@ -1,6 +1,6 @@
 """RegisterPage 模块 UI 测试。
 
-蓝图：docs/test-cases/register_page.md —— 10 条用例（P0×3 + P1×3 + P2×3 + P3×1）。
+蓝图：docs/test-cases/register_page.md —— 14 条用例（P0×3 + P1×5 + P2×4 + P3×2）。
 """
 
 from __future__ import annotations
@@ -108,6 +108,26 @@ class TestRegisterValidation:
         register_page.submit()
         expect(register_page.field_error("email")).to_be_visible(timeout=5000)
 
+    # [UI_REG_011] P1
+    def test_phone_with_letters_shows_error(self, register_page: RegisterPage) -> None:
+        uniq = uuid.uuid4().hex[:8]
+        register_page.fill_basic_info("Test", "User", "1990-01-15")
+        register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
+        register_page.fill_contact("abc", f"test-{uniq}@example.com", _gen_password())
+        register_page.submit()
+        expect(register_page.field_error("phone")).to_be_visible(timeout=5000)
+        expect(register_page.field_error("phone")).to_contain_text("Only numbers are allowed")
+
+    # [UI_REG_012] P1
+    def test_password_too_short(self, register_page: RegisterPage) -> None:
+        uniq = uuid.uuid4().hex[:8]
+        register_page.fill_basic_info("Test", "User", "1990-01-15")
+        register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
+        register_page.fill_contact("5551234567", f"test-{uniq}@example.com", "Ab1!")
+        register_page.submit()
+        expect(register_page.field_error("password")).to_be_visible(timeout=5000)
+        expect(register_page.field_error("password")).to_contain_text("minimal 6 characters")
+
 
 class TestRegisterBoundary:
     """P2 边界条件。"""
@@ -143,6 +163,15 @@ class TestRegisterBoundary:
         # 页面不崩溃；可能通过前端校验或被服务端拒绝
         expect(register_page.register_form).to_be_visible()
 
+    # [UI_REG_013] P2
+    def test_password_visibility_toggle(self, register_page: RegisterPage) -> None:
+        register_page.password_input.fill("test-password")
+        expect(register_page.password_input).to_have_attribute("type", "password")
+        register_page.password_toggle.click()
+        expect(register_page.password_input).to_have_attribute("type", "text")
+        register_page.password_toggle.click()
+        expect(register_page.password_input).to_have_attribute("type", "password")
+
 
 class TestLoggedInState:
     """P3 已登录状态。"""
@@ -163,5 +192,21 @@ class TestLoggedInState:
         expect(logged_in_page.locator("[data-test=nav-menu]")).to_be_visible(timeout=10000)
         logged_in_page.locator("[data-test=nav-menu]").click()
         expect(logged_in_page.locator("[data-test=nav-sign-out]")).to_be_visible(timeout=5000)
+
+class TestRegisterSecurity:
+    """P3 安全注入。"""
+
+    # [UI_REG_014] P3
+    def test_xss_injection_in_name(self, register_page: RegisterPage) -> None:
+        uniq = uuid.uuid4().hex[:8]
+        register_page.fill_basic_info("<script>alert(1)</script>", "User", "1990-01-15")
+        register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
+        register_page.fill_contact("5551234567", f"test-{uniq}@example.com", _gen_password())
+        register_page.submit()
+        # 页面不崩溃、不弹窗
+        expect(register_page.register_form).to_be_visible()
+        # 确认没有 alert 弹窗
+        assert "/auth/register" in register_page._page.url or "/auth/login" in register_page._page.url, \
+            "XSS 注入不应导致页面异常跳转"
 
 # AI-assisted

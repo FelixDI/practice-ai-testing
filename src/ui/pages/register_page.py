@@ -80,6 +80,13 @@ class RegisterPage(BasePage):
     def submit_button(self) -> Locator:
         return self._page.locator("[data-test=register-submit]")
 
+    # -- 密码可见性 -------------------------------------------------------
+
+    @property
+    def password_toggle(self) -> Locator:
+        """密码框旁的 eye icon 按钮（无 data-test，用 CSS 定位）。"""
+        return self._page.locator("[data-test=password] ~ div button")
+
     # -- 错误消息 ---------------------------------------------------------
 
     @property
