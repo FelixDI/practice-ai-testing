@@ -153,11 +153,10 @@ pipeline {
                 // 推送到 gh-pages
                 withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
                     sh '''
-                        git config user.name  "Jenkins CI"
-                        git config user.email "jenkins@ci.local"
-
                         cd _site
                         git init
+                        git config user.name  "Jenkins CI"
+                        git config user.email "jenkins@ci.local"
                         git checkout -b gh-pages
                         git add .
                         git commit -m "Allure report [${BUILD_NUMBER}]" || true
