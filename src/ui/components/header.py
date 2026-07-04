@@ -1,9 +1,9 @@
 """Header —— 顶部导航栏组件。
 
-跨所有页面复用，含两态：
-- 未登录：9 个 nav-* 链接 + 语言切换
-- 已登录：7 个 nav-* 链接（用户菜单）+ 语言切换
-搜索框仅在列表页（HomePage / CategoryPage）出现。
+跨所有页面复用，含三区：
+- 公共导航：11 个 nav-* 链接（含 nav-cart）+ 语言切换
+- 登录态导航：7 个 nav-* 链接（用户菜单）
+- 搜索：仅列表页（HomePage / CategoryPage）出现
 """
 
 from __future__ import annotations
@@ -12,12 +12,12 @@ from playwright.sync_api import Page, Locator
 
 
 class Header:
-    """Toolshop 顶部导航栏，封装导航链接、Categories 下拉、搜索、语言切换。"""
+    """Toolshop 顶部导航栏，封装导航链接、购物车、搜索、语言切换。"""
 
     def __init__(self, page: Page) -> None:
         self._page = page
 
-    # -- 未登录态导航 -------------------------------------------------------
+    # -- 公共导航 -------------------------------------------------------------
 
     @property
     def nav_home(self) -> Locator:
@@ -54,6 +54,18 @@ class Header:
     @property
     def nav_sign_in(self) -> Locator:
         return self._page.locator("[data-test=nav-sign-in]")
+
+    # -- 购物车（始终可见）--------------------------------------------------
+
+    @property
+    def nav_cart(self) -> Locator:
+        """购物车按钮，点击跳转到 /checkout。"""
+        return self._page.locator("[data-test=nav-cart]")
+
+    @property
+    def cart_quantity(self) -> Locator:
+        """购物车角标，显示商品数量。"""
+        return self._page.locator("[data-test=cart-quantity]")
 
     # -- 登录态导航 ---------------------------------------------------------
 
