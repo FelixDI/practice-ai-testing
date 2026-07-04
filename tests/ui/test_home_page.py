@@ -17,7 +17,7 @@ from src.ui.pages.home_page import HomePage
 def home(page: Page) -> HomePage:
     hp = HomePage(page)
     hp.goto()
-    expect(hp.nav_home).to_be_visible(timeout=60000)
+    expect(hp.header.nav_home).to_be_visible(timeout=60000)
     return hp
 
 
@@ -32,25 +32,25 @@ class TestHomePageLoad:
 class TestSearch:
     # [UI_HOME_002] P0
     def test_search_hammer(self, home: HomePage) -> None:
-        home.search("hammer")
+        home.header.search("hammer")
         expect(home.product_cards.first).to_be_visible(timeout=10000)
 
     # [UI_HOME_005] P1
     def test_empty_search(self, home: HomePage) -> None:
-        home.search("")
+        home.header.search("")
         expect(home.notification_bar).to_be_visible()
 
 
 class TestCategoryNavigation:
     # [UI_HOME_003] P0
     def test_navigate_to_hand_tools(self, home: HomePage) -> None:
-        home.navigate_to_category("hand-tools")
+        home.header.navigate_to_category("hand-tools")
         expect(home._page).to_have_url(re.compile(r"/category/hand-tools"))
 
     # [UI_HOME_007] P1
     def test_categories_menu_toggle(self, home: HomePage) -> None:
-        home.nav_categories.click()
-        expect(home.nav_hand_tools).to_be_visible()
+        home.header.nav_categories.click()
+        expect(home.header.nav_hand_tools).to_be_visible()
 
 
 class TestProductDetail:
@@ -70,7 +70,7 @@ class TestSortAndNav:
     # [UI_HOME_008] P1
     def test_sign_in_link(self, home: HomePage) -> None:
         with home._page.expect_navigation():
-            home.nav_sign_in.click()
+            home.header.nav_sign_in.click()
         expect(home._page).to_have_url(re.compile(r"/auth/login"))
 
 
@@ -79,12 +79,12 @@ class TestSearchBoundary:
 
     # [UI_HOME_009] P2
     def test_search_overlong_input(self, home: HomePage) -> None:
-        home.search("A" * 150)
+        home.header.search("A" * 150)
         expect(home.notification_bar).to_be_visible()
 
     # [UI_HOME_010] P2
     def test_search_no_results(self, home: HomePage) -> None:
-        home.search("xyznonexistent999")
+        home.header.search("xyznonexistent999")
         no_result = home._page.locator("text=No products found")
         expect(no_result).to_be_visible(timeout=5000)
 
@@ -104,8 +104,8 @@ class TestSortAndPagination:
 
     # [UI_HOME_012] P2
     def test_pagination_exists(self, home: HomePage) -> None:
-        pagination = home._page.locator("[class*=pagination], [data-test=page], [class*=pager]")
-        _ = pagination.count()
+        _ = home.pagination_next.count()
+        _ = home.pagination_prev.count()
 
 
 class TestLoggedInState:
@@ -124,11 +124,11 @@ class TestLoggedInState:
 
         hp = HomePage(page)
         hp.goto()
-        expect(hp.nav_home).to_be_visible(timeout=60000)
+        expect(hp.header.nav_home).to_be_visible(timeout=60000)
         return hp
 
     # [UI_HOME_013] P3
     def test_logged_in_nav_has_favorites(self, logged_in_home: HomePage) -> None:
-        logged_in_home._page.locator("[data-test=nav-menu]").click()
-        expect(logged_in_home._page.locator("[data-test=nav-sign-out]")).to_be_visible(timeout=5000)
-        expect(logged_in_home._page.locator("[data-test=nav-my-favorites]")).to_be_visible(timeout=5000)
+        logged_in_home.header.nav_menu.click()
+        expect(logged_in_home.header.nav_sign_out).to_be_visible(timeout=5000)
+        expect(logged_in_home.header.nav_my_favorites).to_be_visible(timeout=5000)

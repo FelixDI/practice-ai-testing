@@ -8,12 +8,19 @@ from __future__ import annotations
 from playwright.sync_api import Locator
 
 from src.ui.pages.base_page import BasePage
+from src.ui.components.header import Header
+from src.ui.components.footer import Footer
 
 
 class LoginPage(BasePage):
     """Toolshop 登录页，提供邮箱+密码表单登录。"""
 
     URL = "https://practicesoftwaretesting.com/auth/login"
+
+    def __init__(self, page):  # type: ignore[no-untyped-def]
+        super().__init__(page)
+        self.header = Header(page)
+        self.footer = Footer(page)
 
     # -- Navigation -------------------------------------------------------
 
