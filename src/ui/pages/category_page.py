@@ -57,12 +57,12 @@ class CategoryPage(BasePage):
         return self._page.locator("[data-test=eco-friendly-filter]")
 
     def category_filter(self, label: str) -> Locator:
-        """通过 label 文本定位分类筛选 checkbox。"""
-        return self._page.locator("input[type=checkbox]", has=self._page.locator(f"text={label}"))
+        """通过角色+名称定位分类筛选 checkbox。"""
+        return self._page.get_by_role("checkbox", name=label)
 
     def brand_filter(self, label: str) -> Locator:
-        """通过 label 文本定位品牌筛选 checkbox。"""
-        return self._page.locator("input[type=checkbox]", has=self._page.locator(f"text={label}"))
+        """通过角色+名称定位品牌筛选 checkbox。"""
+        return self._page.get_by_role("checkbox", name=label)
 
     # -- 分页 -------------------------------------------------------------
 

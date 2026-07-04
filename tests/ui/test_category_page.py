@@ -1,6 +1,6 @@
 """CategoryPage 模块 UI 测试。
 
-蓝图：docs/test-cases/ui/category_page.md —— 8 条用例（P0×3 + P1×3 + P2×2）。
+蓝图：docs/test-cases/ui/category_page.md —— 12 条用例（P0×4 + P1×4 + P2×3 + P3×1）。
 """
 
 from __future__ import annotations
@@ -43,6 +43,11 @@ class TestCategoryPageLoad:
         expect(cat_power._page).to_have_url(re.compile(r"/category/power-tools"))
         expect(cat_power.product_cards.first).to_be_visible(timeout=10000)
 
+    # [UI_CAT_009] P0
+    def test_category_heading_shows_correct_name(self, cat_hand: CategoryPage) -> None:
+        expect(cat_hand.category_heading).to_be_visible()
+        expect(cat_hand.category_heading).to_contain_text("Hand Tools")
+
 
 class TestProductNavigation:
     """商品导航。"""
@@ -73,6 +78,25 @@ class TestSortAndSearch:
         expect(cat_hand.product_cards.first).to_be_visible(timeout=10000)
 
 
+class TestFilterSection:
+    """筛选区交互。"""
+
+    # [UI_CAT_010] P1
+    def test_brand_filter_can_be_checked(self, cat_hand: CategoryPage) -> None:
+        brand_cb = cat_hand.brand_filter("ForgeFlex Tools")
+        brand_cb.check()
+        expect(brand_cb).to_be_checked()
+        # 筛选后商品列表重新渲染
+        expect(cat_hand.product_cards.first).to_be_visible(timeout=10000)
+
+    # [UI_CAT_011] P2
+    def test_subcategory_filter_on_power_tools(self, cat_power: CategoryPage) -> None:
+        sub_cb = cat_power.category_filter("Drill")
+        sub_cb.check()
+        expect(sub_cb).to_be_checked()
+        expect(cat_power.product_cards.first).to_be_visible(timeout=10000)
+
+
 class TestNonExistentCategory:
     """不存在分类。"""
 
@@ -96,6 +120,18 @@ class TestAllCategories:
             cp.goto(slug)
             expect(cp._page).to_have_url(re.compile(rf"/category/{slug}"))
             expect(cp.product_cards.first).to_be_visible(timeout=15000)
+
+
+class TestSecurity:
+    """深度防御。"""
+
+    # [UI_CAT_012] P3
+    def test_xss_in_slug_does_not_crash(self, page: Page) -> None:
+        """XSS 注入被 Angular 路由安全处理，跳回首页而非崩溃。"""
+        cp = CategoryPage(page)
+        cp.goto("<script>alert(1)</script>")
+        # 页面应正常加载，Header 可见（不崩溃、不执行脚本）
+        expect(cp.header.nav_home).to_be_visible(timeout=10000)
 
 
 class TestPagination:
