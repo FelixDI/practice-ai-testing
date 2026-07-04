@@ -12,16 +12,14 @@ pipeline {
         stage('Skip Docs-Only') {
             steps {
                 script {
-                    def docsOnly = sh(
+                    def hasCode = sh(
                         script: '''
-                            git diff --name-only HEAD~1 2>/dev/null || git diff --name-only HEAD
+                            FILES=$(git diff --name-only HEAD~1 2>/dev/null || git diff --name-only HEAD)
+                            echo "$FILES" | grep -vE '\\.md$|\\.txt$|^\\.gitignore$|^docs/|^README'
                         ''',
-                        returnStdout: true
-                    ).trim().tokenize('\n').every { file ->
-                        file.endsWith('.md') || file.endsWith('.txt') || file.startsWith('docs/')
-                    }
-
-                    if (docsOnly) {
+                        returnStatus: true
+                    )
+                    if (hasCode != 0) {
                         echo '📄 仅文档变更，跳过测试'
                         env.SKIP_TESTS = 'true'
                     } else {
