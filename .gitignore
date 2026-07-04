@@ -227,3 +227,4 @@ reports/allure-report/
 .DS_Store
 .idea/
 .claude/settings.local.json
+.playwright-mcp/
