@@ -98,6 +98,20 @@ pytest.skip 约束	禁止滥用 + 优先级规则 + 报告机制	AI 不能用跳
 
 ---
 
+## Jenkins 凭据作用域（手动配置，非 AI 任务）
+
+`withCredentials` 在 Pipeline 脚本中读取凭据，Scope **必须选 Global (unrestricted)**。选 System 仅供给 Jenkins 系统底层使用，脚本内 `withCredentials` 读不到。
+
+手动配置步骤：
+
+1. Dashboard → Manage Jenkins → Credentials → Add Credentials → Secret text
+2. Scope: **Global**、Secret: `ghp_xxx`、ID: 和 Jenkinsfile 里 `credentialsId` 对齐
+3. 确认 GitHub Token 的 Scopes 勾选了 `repo`
+
+> 这是 Jenkins 页面的手动操作，AI 无法执行。写入踩坑文档而非 CLAUDE.md，因为 CLAUDE.md 是约束 AI 行为的规范，涉及手动操作的配置应放在这里。
+
+---
+
 ## AI 协作开发流程范式
 
 经过三个阶段（用例设计 → 脚本生成 → CI/UI 测试），沉淀出一套可复用的 AI 协作范式：
