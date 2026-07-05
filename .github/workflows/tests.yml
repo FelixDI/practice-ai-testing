@@ -103,44 +103,7 @@ jobs:
 
       - name: Check site reachability（Playwright 实测，非 curl）
         id: check
-        run: |
-          uv run python << 'PYEOF'
-          import sys, os
-          from playwright.sync_api import sync_playwright
-
-          blocked = False
-          reason = ""
-
-          with sync_playwright() as p:
-              browser = p.chromium.launch()
-              page = browser.new_page()
-              try:
-                  resp = page.goto("https://practicesoftwaretesting.com/", timeout=15000)
-                  body = page.content().lower()
-                  status = resp.status if resp else 0
-
-                  if status == 403 and ("cloudflare" in body or "checking your browser" in body):
-                      blocked = True
-                      reason = f"Cloudflare 拦截 (status={status})"
-                  elif status != 200:
-                      blocked = True
-                      reason = f"站点不可达 (status={status})"
-                  elif 'data-test="nav-home"' not in body:
-                      blocked = True
-                      reason = f"页面未正常渲染 (status={status}, 缺少 nav-home)"
-                  else:
-                      reason = f"✅ 站点可达 (status={status})"
-              except Exception as e:
-                  blocked = True
-                  reason = f"Playwright 异常: {type(e).__name__}: {e}"
-              finally:
-                  browser.close()
-
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"blocked={'true' if blocked else 'false'}\n")
-          label = "⚠️" if blocked else "✅"
-          print(f"{label} {reason}")
-          PYEOF
+        run: uv run python scripts/check_site_reachability.py
 
       - name: Run UI Tests
         if: steps.check.outputs.blocked != 'true'
