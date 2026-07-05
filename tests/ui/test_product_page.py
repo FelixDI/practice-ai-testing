@@ -6,22 +6,11 @@
 from __future__ import annotations
 
 import pytest
-import requests
 from playwright.sync_api import Page, expect
 
-from src.common.config import API_BASE_URL, UI_BASE_URL
+from src.common.config import UI_BASE_URL
 from src.ui.pages.product_page import ProductPage
-
-
-def _fetch_valid_product_id() -> str:
-    """从 API 获取第一个有效商品 ID，避免硬编码 ID 过期。"""
-    r = requests.get(f"{API_BASE_URL}/products?page=1", timeout=10)
-    if r.status_code != 200:
-        pytest.skip("商品 API 不可用，无法获取有效商品 ID")
-    data = r.json().get("data", [])
-    if not data:
-        pytest.skip("商品 API 返回空列表，无可用商品")
-    return data[0]["id"]
+from tests.ui.conftest import fetch_valid_product_id
 
 
 def _is_cloudflare(page: Page) -> bool:
@@ -36,7 +25,7 @@ def _is_cloudflare(page: Page) -> bool:
 @pytest.fixture
 def product(page: Page) -> ProductPage | None:
     """从 API 动态获取有效商品 ID，加载详情页。"""
-    valid_id = _fetch_valid_product_id()
+    valid_id = fetch_valid_product_id()
     pp = ProductPage(page)
     response = page.goto(
         f"{UI_BASE_URL}/product/{valid_id}",
