@@ -30,6 +30,16 @@ TEST_USER_PASSWORD: str = os.getenv(
     "welcome01",
 )
 
+# 管理员账号（报表等管理端接口）
+ADMIN_EMAIL: str = os.getenv(
+    "ADMIN_EMAIL",
+    "admin@practicesoftwaretesting.com",
+)
+ADMIN_PASSWORD: str = os.getenv(
+    "ADMIN_PASSWORD",
+    "welcome01",
+)
+
 # 注册测试用户（每次注册使用唯一邮箱避免冲突）
 # 测试中通过 fixture 动态生成，此处仅作为格式参考
 REGISTER_USER_DATA: dict = {

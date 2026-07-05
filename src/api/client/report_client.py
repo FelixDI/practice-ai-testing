@@ -20,7 +20,7 @@ class ReportClient(BaseClient):
         """热销分类 Top10。GET /reports/top10-best-selling-categories → 200"""
         return self.get("/reports/top10-best-selling-categories")
 
-    def total_sales_of_years(self, years: str | None = None) -> Any:
+    def total_sales_of_years(self, years: list[str] | None = None) -> Any:
         """各年度销售总额。GET /reports/total-sales-of-years → 200"""
         params = {"years": years} if years else None
         return self.get("/reports/total-sales-of-years", params=params)

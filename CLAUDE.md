@@ -50,10 +50,100 @@ docs/
 1. 需求分析——了解业务逻辑和 API 能力
 2. 测试用例设计——输出 MD 至 `docs/test-cases/api/`、`docs/test-cases/ui/` 或 `docs/test-cases/integration/`
 3. 测试脚本生成——基于用例编写 Pytest
-4. **MCP 浏览器验证**——使用 Playwright MCP 打开目标页面，`browser_snapshot` + `browser_evaluate` 批量验证所有 `data-test` 选择器是否存在，禁止提交含不存在选择器的代码（详见 [Playwright MCP 浏览器验证](#playwright-mcp-浏览器验证强制执行)）
-5. 执行校验——`pytest` 运行，分析失败
-6. 缺陷修复——区分测试 Bug 还是环境问题
-7. 当前层级（P0+P1 / P2 / P3）用例全部生成且 pytest 全绿后，按 Git 提交规范推送
+4. **测试前置校验**——写新模块的 fixture 和测试用例前，先做以下 4 项校验（详见 [测试前置校验清单](#测试前置校验清单)）
+5. **MCP 浏览器验证**——使用 Playwright MCP 打开目标页面，`browser_snapshot` + `browser_evaluate` 批量验证所有 `data-test` 选择器是否存在，禁止提交含不存在选择器的代码（详见 [Playwright MCP 浏览器验证](#playwright-mcp-浏览器验证强制执行)）
+6. 执行校验——`pytest` 运行，分析失败
+7. 缺陷修复——区分测试 Bug 还是环境问题
+8. 当前层级（P0+P1 / P2 / P3）用例全部生成且 pytest 全绿后，按 Git 提交规范推送
+
+## 测试前置校验清单（新模块强制执行）
+
+> 开发新 UI Page 或 API Client 时，**在写 pytest 测试代码之前**，先完成以下 4 项校验。
+> 这 4 步能在进入 pytest 之前暴露"数据过期"、"账号权限不足"、"选择器丢失"等最常被 skip 掩盖的问题。
+
+### ① 测试数据有效性校验（UI + API 通用）
+
+**为什么**：ProductPage 硬编码的商品 ID 过期后，fixture 加载不到商品页，旧代码用 `except Exception` 掩盖成"Cloudflare 拦截"。
+
+| 检查项 | 方法 | 通过标准 |
+|--------|------|---------|
+| 硬编码 ID（产品/SKU/分类 slug）当前有效 | 用 `curl` 或 `requests` 调用 API 确认返回 200 | 返回期望数据，不返回 404/500 |
+| 被测试的页面/路由当前可访问 | 浏览器打开或 API HEAD 请求返回 2xx | 页面正常渲染，非空白/500 |
+| 所使用的测试账号对目标端点有正确权限 | 用该账号调用目标 API | 返回 200（非 401/403） |
+
+### ② 账号权限预检（API 测试专用）
+
+**为什么**：Report API 使用 `customer@...`（非管理员）写全套测试 → 15 条全部因 403 skip，写了等于没写。
+
+```python
+# ✅ 在写测试代码之前，先验证账号权限
+r = client.get("/reports/total-sales-per-country")
+if r.status_code == 403:
+    print("❌ 当前账号无权限！需更换为管理员账号")
+    # 查找或确认管理员账号存在后再继续
+```
+
+| 检查项 | 方法 | 通过标准 |
+|--------|------|---------|
+| 确认模块所需权限级别（public / user / admin） | 读 OpenAPI spec 或实测 | 明确知道需要什么角色 |
+| fixture 使用的账号具备该权限 | 先发一个 P0 请求 | 返回 200（非 401/403） |
+
+### ③ Fixture 正确性校验（UI 测试专用）
+
+**为什么**：ProductPage fixture 用 `except Exception` 隐藏了 ID 过期；CategoryPage fixture 确认了 `product_cards.first` 可见，就提前发现 slug 错误。
+
+```python
+# ❌ 禁止 —— fixture 从不报错，把问题留给用例
+@pytest.fixture
+def product(page):
+    pp = ProductPage(page)
+    pp.goto(VALID_ID)
+    try:
+        expect(pp.product_name).to_be_visible()
+        return pp
+    except Exception:          # 什么都接
+        pytest.skip("随便理由")  # 什么都跳过
+
+# ✅ 正确 —— fixture 明确告知错误类型
+@pytest.fixture
+def product(page):
+    pp = ProductPage(page)
+    page.goto(f"{URL}/{VALID_ID}")
+    # 1. 先检查环境拦截
+    if response.status == 403 and "cloudflare" in page.content().lower():
+        pytest.skip("Cloudflare 拦截")
+    # 2. 再判断页面渲染
+    try:
+        expect(pp.product_name).to_be_visible(timeout=N)
+    except AssertionError:
+        pytest.fail("元素不存在——测试数据或选择器错误")  # 忽略 Bug，必报
+    return pp
+```
+
+| 检查项 | 方法 | 通过标准 |
+|--------|------|---------|
+| fixture 不包含裸 `except Exception` | 肉眼检查 | 区分了 `AssertionError`、`TimeoutError`、其他 |
+| fixture 单独的测试（无效 ID、XSS）独立定义 `page` fixture | 测试参数只传 `page`，不传业务 fixture | 不依赖页面数据加载 |
+
+### ④ skip 必要性验证（写任何一个 `pytest.skip` 之前执行）
+
+**为什么**：31 条 skip 中有 15 条（Report API）通过简单预检就能避免；7 条（ProductPage）通过拆异常类型就能暴露真实错误。
+
+```python
+# 在写 pytest.skip() 之前，先问自己 3 个问题：
+# 1. 这个 skip 是永远发生，还是有时发生？→ 永远发生 = 设计缺陷，不应 skip
+# 2. 被跳过的是测试 Bug 还是环境问题？  → 测试 Bug 不应 skip
+# 3. 有没有办法提前发现这个问题？      → 有 → 加到前置校验清单
+```
+
+| 检查项 | 通过标准 |
+|--------|---------|
+| 该 skip 基于显式条件（`if`），非异常捕获 | ✅ 允许继续 |
+| skip reason 包含具体根因（非"环境问题"） | ✅ 允许继续 |
+| 预期该 skip 最终会消失（服务恢复/数据补回后） | ✅ 允许继续 |
+| 该 skip **永远会发生**（如账号权限不够、功能不存在） | ❌ 禁止 —— 是设计缺陷，不是环境问题，必须改 |
+
+---
 
 ## Git 提交规范
 
@@ -344,7 +434,8 @@ Authenticated flow（需登录）:
 
 ### 夹具容错
 
-- 夹具 setup 阶段遇到 500/超时 → 自动重试 2 次 → 仍失败 `pytest.skip`（含具体 reason）
+- **API 夹具**：setup 阶段遇到 500/超时 → 自动重试 2 次 → 仍失败 `pytest.skip`（含具体 reason）
+- **UI 夹具**：不得使用裸 `except Exception`，必须按异常类型分派 —— `AssertionError → pytest.fail()`（测试/选择器 Bug）、`TimeoutError → skip`（环境问题），详见 [UI fixture 编码规范](#ui-fixture-编码规范)
 - 后置清理遇到 500/409 → 静默放行，不抛断言
 
 ---
@@ -369,6 +460,7 @@ Authenticated flow（需登录）:
 - **禁止** 在 P0/P1 核心业务用例中使用 `pytest.skip`，除非被测服务整体不可用（502/503/连接超时）
 - **禁止** 无 `reason` 参数或使用 "skip this test" 等模糊描述
 - **禁止** 在业务断言失败、测试代码逻辑错误场景使用 `pytest.skip` 掩盖问题
+- **禁止** 在 fixture 中使用裸 `except Exception` 接住所有异常后 skip —— 必须按异常类型分派（详见 [UI fixture 编码规范](#ui-fixture-编码规范) 中的异常分类参考，API夹具同理）
 
 #### 生效前置规则
 
@@ -588,11 +680,12 @@ PYTEST = str(PROJECT_ROOT / ".venv" / "bin" / "pytest")  # 跨平台炸
 | 1 | **固定账号 + 可变状态 = 409** | module 夹具收藏了商品 A，function 测试也想收藏 → 409 | function 级测试用 `_get_unfavorited_product()` 先查列表 |
 | 2 | **module 夹具 token 过期** | 全量跑 12+ 分钟，后面测试 POST/PUT 全返回 401 | 在 `ctx` 夹具里加 `uc.login()` 重新登录 |
 | 3 | **硬编码 slug 跨 CI run 冲突** | 上次 CI 创建了 `slug="unauth-x"`，这次再创 → 409 | 用 `uuid.uuid4().hex[:8]` 动态生成唯一值 |
-| 4 | **地址校验随机波动** | `POST /invoices` 返回 422 "city does not belong to country" | 准备多个备选地址（`BILLING_FALLBACKS`），逐个尝试 |
+| 4 | **地址校验服务不可用（永久）** | `POST /invoices` 返回 422 "city does not belong to country"，7+ 种地址变体（DE/NL/US、全称/缩写）全部失败，已验证为服务端地址校验数据库已失效 | 当前不可修复，依赖 `_mod_invoice` 的 14 条测试级联 skip，skip reason 明确标注为服务端问题；恢复后可删 fallback 逻辑 |
 | 5 | **商品 ID 数据竞争** | 添加商品到购物车返回 422 "product id is invalid" | 遍历前 5 个商品，找到一个能成功添加的 |
 | 6 | **OpenAPI 文档 ≠ 实际行为** | 文档说 400，实际 422；文档说 404，实际 204 | 以实测为准，代码里 `assert status_code in (X, Y)` 弹性断言 |
 | 7 | **同一账号多测试文件共享** | `customer@practicesoftwaretesting.com` 被多个文件同时用 | 只读操作用固定账号；写操作注册独立账号 |
 | 8 | **`except Exception` + `pytest.skip` 掩盖真实 Bug** | fixture 用裸 `except Exception: pytest.skip(...)` 跳过所有错误 → 产品 ID 过期导致页面加载失败本应爆红，却表现为"7 skipped Cloudflare" | fixture 必须按异常类型分派：`AssertionError → pytest.fail()`（测试 Bug）、`TimeoutError → skip`（环境问题）；详见[UI fixture 编码规范](#ui-fixture-编码规范) |
+| 9 | **测试账号角色与接口权限不匹配** | 报表端点需要管理员权限，但 fixture 使用 `customer@...` 导致全部 15 条测试返回 403 后 skip | 验证每个模块的权限需求。Report 类存在 `admin@practicesoftwaretesting.com / welcome01`，创建客户端时使用对应角色的账号 |
 
 ## Agent 规范（占位，待多 Agent 工作流启用后补充）
 
