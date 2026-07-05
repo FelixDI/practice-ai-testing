@@ -6,13 +6,22 @@
 from __future__ import annotations
 
 import pytest
-from playwright.sync_api import Error as PlaywrightError
+import requests
 from playwright.sync_api import Page, expect
 
-from src.common.config import UI_BASE_URL
+from src.common.config import API_BASE_URL, UI_BASE_URL
 from src.ui.pages.product_page import ProductPage
 
-VALID_ID = "01KWR3GEF7T1HCXQXC111YATDY"
+
+def _fetch_valid_product_id() -> str:
+    """从 API 获取第一个有效商品 ID，避免硬编码 ID 过期。"""
+    r = requests.get(f"{API_BASE_URL}/products?page=1", timeout=10)
+    if r.status_code != 200:
+        pytest.skip("商品 API 不可用，无法获取有效商品 ID")
+    data = r.json().get("data", [])
+    if not data:
+        pytest.skip("商品 API 返回空列表，无可用商品")
+    return data[0]["id"]
 
 
 def _is_cloudflare(page: Page) -> bool:
@@ -26,16 +35,17 @@ def _is_cloudflare(page: Page) -> bool:
 
 @pytest.fixture
 def product(page: Page) -> ProductPage | None:
-    """尝试加载商品详情页，Cloudflare 拦截或环境异常时跳过测试。"""
+    """从 API 动态获取有效商品 ID，加载详情页。"""
+    valid_id = _fetch_valid_product_id()
     pp = ProductPage(page)
     response = page.goto(
-        f"{UI_BASE_URL}/product/{VALID_ID}",
+        f"{UI_BASE_URL}/product/{valid_id}",
         wait_until="load",
         timeout=30000,
     )
     # 1. 检查 Cloudflare 拦截（response 403 + 页面特征）
     if response and response.status == 403 and _is_cloudflare(page):
-        pytest.skip(f"Cloudflare 拦截商品页 ({VALID_ID})，环境不可用")
+        pytest.skip(f"Cloudflare 拦截商品页 ({valid_id})，环境不可用")
     # 2. 检查页面是否渲染正常
     try:
         expect(pp.product_name).to_be_visible(timeout=30000)

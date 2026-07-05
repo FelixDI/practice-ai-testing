@@ -23,7 +23,7 @@
 
 | 用例编号 | 优先级 | 用例标题 | 前置条件 | 测试步骤 | 预期结果 |
 |------|:--:|------|------|------|------|
-| UI_PROD_001 | P0 | 商品详情页正常加载 | 商品 ID 有效（如 `01KWR3GEF7T1HCXQXC111YATDY`） | 访问 `/product/{id}` | product-name / unit-price / product-description 均 visible |
+| UI_PROD_001 | P0 | 商品详情页正常加载 | 商品 ID 有效（fixture 从 API 动态获取） | 访问 `/product/{id}` | product-name / unit-price / product-description 均 visible |
 | UI_PROD_002 | P0 | 加购按钮可用 | 商品详情页 | 点击 Add to cart | 按钮可点击；页面无报错 |
 | UI_PROD_003 | P0 | 数量可增加 | 商品详情页 | 点击 increase-quantity | quantity 值变为 2 |
 
