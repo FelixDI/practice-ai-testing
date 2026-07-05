@@ -3,6 +3,9 @@ pipeline {
 
     environment {
         PATH = "${HOME}/.local/bin:${PATH}"
+        // Jenkins 专用测试账号，与本地开发隔离，避免并发写入/登录冲突
+        TEST_USER_EMAIL = "jenkins-ci-f73dce88@example.com"
+        TEST_USER_PASSWORD = "QCOCIxFX4-PhLPUK!J1"
     }
 
     stages {
