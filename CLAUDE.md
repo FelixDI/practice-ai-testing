@@ -420,6 +420,95 @@ Authenticated flow（需登录）:
 
 ---
 
+## UI 测试稳定性总纲
+
+> **核心背景**：被测站点 `practicesoftwaretesting.com` 使用了 Cloudflare 反爬保护，Chromium headless 模式下可能出现 403 拦截或 Challenge 页面，属于环境波动而非测试代码逻辑问题。
+
+**防护三层机制（执行优先级从高到低）**：
+
+```
+选择器 MCP 提前验证 > 显式等待（expect/auto-waiting） > 环境异常跳过（低频）
+```
+
+---
+
+### 🚨 UI 测试 pytest.skip 强制约束（AI 必须遵守）
+
+UI 测试 **同样适用** API 章节 [pytest.skip 强制约束](#-pytestskip-强制约束ai-必须遵守) 的全部基础规则：
+- 禁止为"让测试通过"而 skip
+- 禁止 P0/P1 无理由 skip
+- 禁止无 `reason` 参数
+- 禁止对业务断言失败使用 skip 掩盖
+- AI 必须报告任何新增的 skip
+
+#### UI 附加禁止行为
+
+- **禁止** fixture 中使用裸 `except Exception` 捕获所有异常后 skip——必须区分异常类型
+- **禁止** 页面元素不存在就自动 skip——先检查选择器是否正确（MCP 验证），确认是环境问题再考虑 skip
+- **禁止** fixture skip 导致独立测试被连带跳过——不依赖 fixture 的测试（无效 ID、XSS 等）必须独立执行，不受 fixture 加载失败影响
+- **禁止** 同一文件 skip 比例超过 50%（P0+P1 中超过 30%），超过必须排查根因
+
+#### 允许 skip 的场景（UI 专属）
+
+| 场景 | 判断方法 | 示例 reason |
+|------|------|------|
+| Cloudflare/反爬拦截 | `page.content()` 含 `cloudflare` 或 `Checking your browser`；或 `response.status == 403` | `"Cloudflare 拦截({url})，环境不可用"` |
+| 登录页自动重定向非测试目标 | 当前 URL 跳转到 `/auth/login` | `"CheckoutPage 需登录，非测试范围"` |
+| 依赖功能数据为空（0 商品分类） | 页面加载正常但主要列表容器为空 | `"special-tools 分类无商品，跳过"` |
+| 视口/设备不兼容 | 已知响应式断点 | `"该功能仅桌面视口支持"` |
+
+#### UI fixture 编码规范
+
+1. **区分异常类型**：`except Exception` 禁止。至少分三路：
+   - `AssertionError`（expect 失败）→ `pytest.fail()`（测试/选择器问题）
+   - `TimeoutError` → 可考虑 skip（环境慢/拦截）
+   - `其他` → 记录后 skip（需要报告）
+2. **检查 Cloudflare 特征**：不要只靠超时判断，显式检查页面内容是否含 Cloudflare 关键字
+3. ** fixture 职责单一**：仅负责页面加载就绪，不承载业务断言
+
+```python
+# ✅ fixture 正确做法
+@pytest.fixture
+def product(page: Page) -> ProductPage | None:
+    pp = ProductPage(page)
+    response = page.goto(f"{ProductPage.BASE_URL}/{VALID_ID}", wait_until="load", timeout=30000)
+    # 1. 检查 Cloudflare 拦截
+    if response and response.status == 403:
+        body = page.content()  # type: ignore[no-untyped-call]
+        if "cloudflare" in body.lower():
+            pytest.skip("Cloudflare 拦截商品页，环境不可用")
+    # 2. 判断页面加载
+    try:
+        expect(pp.product_name).to_be_visible(timeout=30000)
+    except AssertionError:
+        pytest.fail("product-name 不可见，请检查选择器或页面结构")  # 测试代码问题
+    except TimeoutError:
+        pytest.skip("商品页超时，环境异常")
+    return pp
+
+# ❌ 禁止
+@pytest.fixture
+def product(page):
+    pp = ProductPage(page)
+    pp.goto(VALID_ID)
+    try:
+        ...
+        return pp
+    except Exception:                    # 裸捕获——无法区分错误类型
+        pytest.skip("随便一个理由")      # 掩盖了测试代码 Bug
+```
+
+#### 异常分类参考（Playwright）
+
+| 异常类型 | 含义 | 处理 |
+|------|------|------|
+| `TimeoutError` | 显式等待超时 | 环境问题 → 允许 skip |
+| `AssertionError` | `expect` 断言失败 | 测试/选择器 Bug → `pytest.fail()` |
+| `Error` (Playwright) | 页面操作异常（元素 detached、navigation 失败） | 视具体场景判断 |
+| 其他异常 | 网络断开、浏览器崩溃 | 报告后 skip |
+
+---
+
 ## CI/CD 规范
 
 ### Workflow 触发条件
@@ -503,6 +592,7 @@ PYTEST = str(PROJECT_ROOT / ".venv" / "bin" / "pytest")  # 跨平台炸
 | 5 | **商品 ID 数据竞争** | 添加商品到购物车返回 422 "product id is invalid" | 遍历前 5 个商品，找到一个能成功添加的 |
 | 6 | **OpenAPI 文档 ≠ 实际行为** | 文档说 400，实际 422；文档说 404，实际 204 | 以实测为准，代码里 `assert status_code in (X, Y)` 弹性断言 |
 | 7 | **同一账号多测试文件共享** | `customer@practicesoftwaretesting.com` 被多个文件同时用 | 只读操作用固定账号；写操作注册独立账号 |
+| 8 | **`except Exception` + `pytest.skip` 掩盖真实 Bug** | fixture 用裸 `except Exception: pytest.skip(...)` 跳过所有错误 → 产品 ID 过期导致页面加载失败本应爆红，却表现为"7 skipped Cloudflare" | fixture 必须按异常类型分派：`AssertionError → pytest.fail()`（测试 Bug）、`TimeoutError → skip`（环境问题）；详见[UI fixture 编码规范](#ui-fixture-编码规范) |
 
 ## Agent 规范（占位，待多 Agent 工作流启用后补充）
 
