@@ -24,6 +24,7 @@ src/
   ui/components/     # UI 组件对象（跨页面复用的 UI 片段：Header/Footer/ProductCard 等）
   api/client/        # API 客户端封装（API Object Pattern），按资源模块拆分
   common/            # 配置、日志、通用工具
+scripts/             # CI/工具脚本（如 check_site_reachability.py）
 tests/
   ui/                # UI 测试
   api/               # API 测试（含 conftest.py，夹具仅供 API 层使用）
@@ -317,8 +318,7 @@ src/ui/
 └── components/      # 组件对象 —— 跨页面复用的 UI 组件
     ├── header.py        # 顶部导航栏（分类菜单、搜索框、购物车图标）
     ├── footer.py        # 页脚
-    ├── product_card.py  # 商品卡片（首页列表、分类页、搜索页共用）
-    └── login_form.py    # 登录表单（LoginPage、弹窗共用）
+    └── product_card.py  # 商品卡片（首页列表、分类页、搜索页共用）
 ```
 
 - **Page**：对应一个路由，负责页面级操作（`goto`、等待加载完成）
@@ -334,52 +334,34 @@ src/ui/
 - **禁止** `page.wait_for_timeout()` 固定等待（本地碰巧够，CI 全炸）。必须使用 `expect()`、`wait_for_url()`、`expect_navigation()`、`wait_for_selector()` 等显式等待
 - 断言统一使用 `expect`
 
-### Playwright MCP 浏览器验证（强制执行）
+### Playwright MCP 浏览器验证
 
-Playwright MCP 是 UI 测试开发的**实时纠错手段**——让 AI 直接操作浏览器验证选择器和交互逻辑，而非盲写代码等 pytest 报错。
+Playwright MCP 让 AI 直接操作浏览器验证选择器和交互逻辑。**但 DOM 快照消耗大量 token，仅在以下两种场景使用：**
 
-**触发时机**：
-- 新建或修改 Page Object → 必须用 MCP 打开页面验证所有 `data-test` 选择器
-- 新建或修改 Component → 必须用 MCP 打开至少 2 个使用该组件的页面验证
-- 提取 Component 前 → 用 MCP 浏览多个页面确认复用范围
-- 调试 UI 测试失败 → 用 MCP 复原操作步骤、截图对比
+| 场景 | 何时用 | 不用时替代方案 |
+|------|------|------|
+| 🆕 **首次探索新页面** | 新建 Page Object 前，获取 DOM 结构 + 选择器列表 | — |
+| 🐛 **反复修不好的 Bug** | pytest 多次失败、上下文信息不足以定位根因时 | 优先从已有快照/文档/代码推断 |
 
-**验证清单**：
+**日常开发优先复用**：
+1. `.playwright-mcp/` 下已保存的快照文件（如 `page-*.yml`）
+2. `docs/test-cases/ui/{page}.md` 中记录的选择器表
+3. CLAUDE.md 页面对象清单中的验证结论
+4. 已有 Page Object 代码中的选择器
+
+**首次探索流程**（新 Page 开发时执行一次）：
 
 | 步骤 | 工具 | 目的 |
 |------|------|------|
 | 1. 打开目标页面 | `browser_navigate` | 加载页面 |
 | 2. 获取 DOM 快照 | `browser_snapshot` | 了解页面结构、语义角色、层级 |
 | 3. 批量检查选择器 | `browser_evaluate` | 验证所有 `data-test` 是否存在 |
-| 4. 截图确认（可选） | `browser_take_screenshot` | 视觉对比、布局确认 |
-| 5. 交互验证（可选） | `browser_click` / `browser_type` | 验证点击、输入后状态变化 |
-
-**`browser_evaluate` 验证模板**：
-
-```js
-() => {
-  const selectors = ['nav-home', 'nav-categories', 'search-query', /* ... */];
-  const results = {};
-  for (const s of selectors) {
-    const el = document.querySelector(`[data-test="${s}"]`);
-    results[s] = el ? el.tagName : 'MISSING';
-  }
-  return results;
-}
-```
+| 4. 保存快照到 `.playwright-mcp/` | — | 供后续复用，避免重复调用 |
 
 **通过标准**：
 - 所有 Page Object 中引用的 `data-test` 选择器必须返回非 `MISSING`
 - 登录态专属选择器必须在登录后单独验证
 - 发现 `MISSING` → 立即修复选择器，**禁止提交含不存在选择器的代码**
-
-**Component 抽取决策**（MCP 辅助）：
-
-| 组件 | 验证方法 | 判定标准 |
-|------|------|------|
-| `Header` | 分别打开 HomePage + LoginPage，执行 `querySelectorAll('[data-test^="nav-"]')` | 两个页面返回的 `data-test` 列表一致 |
-| `Footer` | 同上，检查页脚链接 | 跨页面一致 |
-| `ProductCard` | 打开 HomePage + CategoryPage，检查 `.card` 或 `a[href*="/product/"]` 结构 | DOM 子树结构一致 |
 
 #### MCP 配置维护
 
@@ -648,10 +630,10 @@ def product(page):
 
 | Workflow | 触发 | 作用 |
 |------|------|------|
-| **Tests** | push/PR 到 main（`src/` `tests/` `pyproject.toml` `uv.lock` 变更） | API + UI 并行测试 |
+| **Tests** | push/PR 到 main（`src/` `tests/` `scripts/` `pyproject.toml` `uv.lock` `.github/workflows/tests.yml` 变更） | API + UI 并行测试 |
 | **Deploy Allure** | Tests 完成（仅 success） | 生成 API/UI Allure HTML → 发布 GitHub Pages |
 
-> **已知限制**：`practicesoftwaretesting.com` 启用了 Cloudflare 反爬保护，GitHub Actions Runner 可能被拦截（返回 403 或 Cloudflare 挑战页）。CI 已配置 `Check site reachability` 步骤自动检测并跳过 UI 测试。UI 测试以本地执行为准。
+> **已知限制**：`practicesoftwaretesting.com` 启用了 Cloudflare 反爬保护，GitHub Actions Runner 可能被拦截（返回 403 或 Cloudflare 挑战页）。CI 已配置 `Check site reachability` 步骤（`scripts/check_site_reachability.py`，Playwright 实测而非 curl）自动检测并跳过 UI 测试。UI 测试以本地执行为准。
 
 ### CI 失败处理
 

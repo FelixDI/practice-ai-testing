@@ -21,6 +21,18 @@ def page(context: BrowserContext) -> Page:
     return context.new_page()
 
 
+def is_cloudflare(page: Page) -> bool:
+    """检查当前页面是否被 Cloudflare 拦截。
+
+    供各 UI fixture 复用，避免每个测试文件重复定义。
+    """
+    try:
+        body = page.content()
+        return "cloudflare" in body.lower() or "checking your browser" in body.lower()
+    except Exception:
+        return False
+
+
 def fetch_valid_product_id() -> str:
     """从 API 获取第一个有效商品 ID。
 

@@ -9,15 +9,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from src.ui.pages.contact_page import ContactPage
-
-
-def _is_cloudflare(page: Page) -> bool:
-    """检查当前页面是否被 Cloudflare 拦截。"""
-    try:
-        body = page.content()
-        return "cloudflare" in body.lower() or "checking your browser" in body.lower()
-    except Exception:
-        return False
+from tests.ui.conftest import is_cloudflare
 
 
 @pytest.fixture
@@ -25,7 +17,7 @@ def contact(page: Page) -> ContactPage | None:
     """加载留言表单页。"""
     cp = ContactPage(page)
     response = page.goto(ContactPage.BASE_URL, wait_until="load", timeout=30000)
-    if response and response.status == 403 and _is_cloudflare(page):
+    if response and response.status == 403 and is_cloudflare(page):
         pytest.skip("Cloudflare 拦截留言页，环境不可用")
     try:
         expect(cp.first_name).to_be_visible(timeout=30000)

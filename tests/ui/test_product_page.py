@@ -10,16 +10,7 @@ from playwright.sync_api import Page, expect
 
 from src.common.config import UI_BASE_URL
 from src.ui.pages.product_page import ProductPage
-from tests.ui.conftest import fetch_valid_product_id
-
-
-def _is_cloudflare(page: Page) -> bool:
-    """检查当前页面是否被 Cloudflare 拦截。"""
-    try:
-        body = page.content()
-        return "cloudflare" in body.lower() or "checking your browser" in body.lower()
-    except Exception:
-        return False
+from tests.ui.conftest import fetch_valid_product_id, is_cloudflare
 
 
 @pytest.fixture
@@ -33,7 +24,7 @@ def product(page: Page) -> ProductPage | None:
         timeout=30000,
     )
     # 1. 检查 Cloudflare 拦截（response 403 + 页面特征）
-    if response and response.status == 403 and _is_cloudflare(page):
+    if response and response.status == 403 and is_cloudflare(page):
         pytest.skip(f"Cloudflare 拦截商品页 ({valid_id})，环境不可用")
     # 2. 检查页面是否渲染正常
     try:
