@@ -177,6 +177,185 @@ AI 不会主动查参考信息：CLAUDE.md 中的描述性表格对 AI 行为无
 
 ---
 
+# 第五阶段：MCP 工具链集成 — 从"配置即用"到"踩坑排雷"
+
+## 问题 11：Playwright MCP 配置正确但工具列表不出现
+
+**现象**：`~/.claude/mcp.json` 中配置了 `@playwright/mcp`，JSON 格式有效，`npx` 命令手动测试能正常启动 stdio 握手并返回工具列表。但 Claude Code 重启后工具列表里看不到 `browser_navigate`、`browser_click` 等 Playwright 工具。
+
+**根因分析（两层）**：
+
+**第一层：`npx` shebang 脚本无法被 Claude Code 直接执行**
+
+```json
+// ❌ 原始配置 —— npx 是 Node.js shebang 脚本 (#! /usr/bin/env node)
+// Claude Code 的 MCP 进程启动器无法正确解析 shebang
+{
+  "playwright": {
+    "command": "npx",
+    "args": ["-y", "@playwright/mcp"]
+  }
+}
+```
+
+对比项目中正常工作的另外两个 MCP server：
+
+| Server | command | 类型 | 状态 |
+|--------|---------|------|:--:|
+| github | `/opt/homebrew/bin/mcp-server-github` | Go 编译的 Mach-O 二进制 | ✅ |
+| pytest-runner | `uv` | Rust 编译的 Mach-O 二进制 | ✅ |
+| playwright | `npx` | Node.js shebang 脚本 | ❌ |
+
+结论：Claude Code 的 MCP launcher 可以 spawn 二进制可执行文件，但无法处理需要 `env` 解析 `node` 的 shebang 脚本。
+
+**第二层：`~/.claude/mcp.json` vs `~/.claude.json` 的配置源冲突**
+
+两个文件都声明了 `mcpServers`：
+- `~/.claude.json` → `mcpServers: {}`（由 `claude mcp add` 写入，Claude Code 优先读取）
+- `~/.claude/mcp.json` → 3 个 server（手动写入，**不保证被读取**）
+
+验证证据：
+```
+~/Library/Caches/claude-cli-nodejs/.../
+├── mcp-logs-github/         ← ✅ Claude Code 启动了 github
+├── mcp-logs-pytest-runner/  ← ✅ Claude Code 启动了 pytest-runner
+└── mcp-logs-playwright/     ← ❌ 不存在 —— Claude Code 根本没尝试启动
+```
+
+同一个 `mcp.json` 文件中的 3 个 server，github 和 pytest-runner 正常，playwright 被静默跳过。这是 Claude Code 的已知 bug（[#27373](https://github.com/anthropics/claude-code/issues/27373)），部分 server 会被跳过且无任何错误提示。
+
+**解决方案**：
+
+1. **使用 `claude mcp add` 代替手动编辑 `mcp.json`**
+
+```bash
+claude mcp add -s user playwright -- /opt/homebrew/bin/node \
+  /opt/homebrew/lib/node_modules/@playwright/mcp/cli.js
+```
+
+这条命令写入 `~/.claude.json`，Claude Code 可靠读取，且自动补齐 `"type": "stdio"` 和 `"env": {}` 字段。
+
+2. **command 使用绝对路径二进制 + 绝对路径入口文件**
+
+```json
+// ✅ 正确 —— 绕过 shebang 解析
+{
+  "playwright": {
+    "type": "stdio",
+    "command": "/opt/homebrew/bin/node",
+    "args": [
+      "/opt/homebrew/lib/node_modules/@playwright/mcp/cli.js"
+    ],
+    "env": {}
+  }
+}
+```
+
+修复后验证：`mcp-logs-playwright/` 目录出现，日志显示 "Successfully connected (transport: stdio) in 239ms"。
+
+## 问题 12：浏览器引擎选择：`--browser` 不认 `chromium`
+
+**现象**：Playwright MCP 连接成功后，`browser_navigate` 报错：
+
+```
+Chromium distribution 'chrome' is not found at /Applications/Google Chrome.app
+```
+
+想让 MCP 用已安装的 `chromium-1228`（在 Playwright 缓存里），加了 `--browser chromium`：
+
+```
+Browser "chrome-for-testing" is not installed
+```
+
+**根因**：`@playwright/mcp` 的 `--browser` 选项只接受 4 个值：
+
+| 值 | 对应 |
+|---|---|
+| `chrome` | 系统 Chrome 或 Chrome for Testing |
+| `firefox` | Firefox |
+| `webkit` | WebKit（Safari 引擎） |
+| `msedge` | Microsoft Edge |
+
+**`chromium` 不是有效值**。虽然 Playwright 底层支持 `chromium`，但 MCP server 层做了自己的映射。
+
+**解决方案**：用 `--executable-path` 指向 Playwright 缓存中已有的 Chromium：
+
+```bash
+claude mcp add -s user playwright -- \
+  /opt/homebrew/bin/node \
+  /opt/homebrew/lib/node_modules/@playwright/mcp/cli.js \
+  --executable-path \
+  "/Users/felix/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+```
+
+**最终效果**：Chromium 浏览器有头模式正常打开，`browser_navigate`、`browser_snapshot`、`browser_evaluate`、`browser_click` 等 20+ 个工具全部可用。
+
+---
+
+## 问题 13：Playwright MCP 的破坏性工具标注
+
+**现象**：Playwright MCP 的 23 个工具分两类：`readOnlyHint: true`（截图/快照/网络请求等只读工具）和 `destructiveHint: true`（点击/输入/提交/页面跳转等写入工具）。
+
+**踩坑**：首次使用时未意识到 `browser_navigate` 被标记为 destructive——这意味着 Claude 调用该工具时需要权限确认。但 MCP 工具列表中的 `readOnlyHint`/`destructiveHint` 标注可以让 AI 在规划操作时准确判断哪些工具需要预警。
+
+---
+
+## 问题 14：VSCode 插件沙箱 vs CLI 终端 —— 两套 MCP 配置源
+
+**现象**：用 `claude mcp add -s user` 配置 Playwright MCP 后，终端 `claude` CLI 中工具正常可用。但 VSCode 插件里打开同一个项目，Playwright 工具列表为空。
+
+**根因**：Claude Code 的 CLI 和 VSCode 插件读取不同的 MCP 配置源：
+
+| 入口 | 配置源 | 写入方式 |
+|------|------|------|
+| 终端 CLI | `~/.claude.json` | `claude mcp add -s user` |
+| VSCode 插件沙箱 | `~/.claude/mcp.json` | 手动编辑 |
+
+CLI 能正常 spawn 二进制可执行文件，但 VSCode 插件运行在沙箱环境中，对 shebang 脚本的解析更严格。因此 `mcp.json` 需要用 `/bin/sh -c` 包装：
+
+```json
+// ✅ VSCode 插件沙箱兼容配置 —— 必须用 shell 包装
+{
+  "playwright": {
+    "command": "/bin/sh",
+    "args": ["-c", "/opt/homebrew/bin/node /opt/homebrew/lib/node_modules/@playwright/mcp/cli.js"]
+  }
+}
+```
+
+**容易犯的错误**：以为 CLI 能用了 VSCode 也能用，或者反过来只配了一个文件以为全平台通用。实际上需要**双端维护**——`~/.claude.json` 给 CLI，`~/.claude/mcp.json` 给 VSCode 插件。
+
+**解决方案**：
+1. `~/.claude.json`：用 `claude mcp add -s user` 写入，服务 CLI
+2. `~/.claude/mcp.json`：手写 `/bin/sh -c` 包装格式，服务 VSCode 插件沙箱
+3. 两端配置要保持同步（相同的入口文件路径、相同的 browser/executable-path 参数）
+
+**清理多余参数**：早期尝试过程中在 `mcp.json` 里加了 `--browser chromium`、`--headless`、`--test-id-attribute "data-test"`。这些 flag 要么无效（`chromium` 不是有效值），要么与需求相反（加了 `--headless` 就看不到浏览器窗口），要么是默认值（`data-test` 本来就默认）。最终清理为纯路径配置。
+
+---
+
+## 第五阶段工程规范总汇
+
+| 规范类别 | 规范内容 | 解决的问题 |
+|---------|---------|----------|
+| MCP 配置入口 | MCP server 必须用 `claude mcp add -s user` 写入 `~/.claude.json`，禁止手写 `~/.claude/mcp.json` | 配置源冲突导致 server 被静默跳过 |
+| MCP 命令格式 | command 使用绝对路径二进制，`args` 使用绝对路径脚本；禁止 `command: npx` | shebang 脚本 Claude Code 无法执行 |
+| 浏览器选择 | `--browser` 仅支持 chrome/firefox/webkit/msedge；使用已安装的 Chromium 需 `--executable-path` | "chromium" 不是有效 browser 值 |
+| **双端配置** | **`~/.claude.json`（CLI）和 `~/.claude/mcp.json`（VSCode 插件）需分别维护，两端配置保持一致** | **VSCode 插件工具列表为空** |
+| MCP 验证流程 | 新配置后检查 `~/Library/Caches/claude-cli-nodejs/.../mcp-logs-{name}/` 确认进程启动 | 判断是配置问题还是启动问题 |
+| MCP 输出目录 | `.playwright-mcp/` 加入 `.gitignore` | 截图/快照/日志不进入版本库 |
+
+## 踩坑经验总结（第五阶段新增）
+
+- **配置文件优先级不是直觉的**：`mcp.json` ≠ `.claude.json`，`claude mcp add` 才写入可靠配置
+- **可执行 vs shebang 是硬门槛**：Claude Code 的 MCP launcher 只能 spawn 二进制，不能解析 `#!/usr/bin/env node`
+- **工具不出现 = 沉默失败**：Claude Code 不会提示 MCP server 启动失败，只能通过日志目录是否存在来判断
+- **CLI 能用 ≠ VSCode 能用**：两套配置源、两套进程环境，必须双端维护
+- **`/bin/sh -c` 是 VSCode 沙箱的通行证**：shell 包装让沙箱能间接调用 shebang 脚本
+- **MCP 不是万能胶**：`@playwright/mcp`（浏览器）的价值远大于 API MCP——因为 AI 需要"眼睛"看 DOM，但 API 这端 AI 直接读代码就够
+
+---
+
 ## Jenkins 凭据作用域（手动配置，非 AI 任务）
 
 `withCredentials` 在 Pipeline 脚本中读取凭据，Scope **必须选 Global (unrestricted)**。选 System 仅供给 Jenkins 系统底层使用，脚本内 `withCredentials` 读不到。
@@ -193,7 +372,7 @@ AI 不会主动查参考信息：CLAUDE.md 中的描述性表格对 AI 行为无
 
 ## AI 协作开发流程范式
 
-经过三个阶段（用例设计 → 脚本生成 → CI/UI 测试），沉淀出一套可复用的 AI 协作范式：
+经过五个阶段（用例设计 → 脚本生成 → CI/UI 测试 → Skip 治理 → MCP 集成），沉淀出一套可复用的 AI 协作范式：
 
 ```
 发现问题 → 解决当前问题 → 提炼为规范 → 约束到 CLAUDE.md → AI 下次自动遵守
@@ -216,6 +395,9 @@ AI 每次犯错都是**系统性漏洞**的暴露——不只是这一次的 bug
 | **Skip 治理** | **测试账号角色错误导致 15 条永久 skip** | 前置校验清单 + config.py 管理员账号 | 15 skip → 29 pass |
 | **Skip 治理** | **地址校验"随机波动"为永久故障** | 踩坑 #4 更新为"不可修复" | 16 skip 有明确根因，不再误导排查 |
 | **Skip 治理** | **踩坑速查表对 AI 无约束力** | 改为引用表，约束力来源于指令型规范 | 消除无效参考型信息 |
+| **MCP 集成** | **`mcp.json` 配置被静默跳过，工具不出现** | `claude mcp add` 写入 `.claude.json` + 绝对路径二进制 | 20+ 工具可用，AI 能直接操控浏览器 |
+| **MCP 集成** | **`npx` shebang 脚本 Claude Code 无法执行** | command 用绝对路径 node + 绝对路径入口文件 | 启动成功（239ms） |
+| **MCP 集成** | **CLI 能用但 VSCode 插件无工具** | `~/.claude.json` + `~/.claude/mcp.json` 双端维护 + `/bin/sh -c` 包装 | 两种入口均可使用 |
 
 ### 核心原则
 
