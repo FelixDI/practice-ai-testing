@@ -26,22 +26,30 @@ def main() -> int:
             resp = page.goto(
                 "https://practicesoftwaretesting.com/", timeout=15000
             )
-            body = page.content().lower()
             status = resp.status if resp else 0
 
-            if status == 403 and (
-                "cloudflare" in body or "checking your browser" in body
-            ):
-                blocked = True
-                reason = f"Cloudflare 拦截 (status={status})"
-            elif status != 200:
-                blocked = True
-                reason = f"站点不可达 (status={status})"
-            elif 'data-test="nav-home"' not in body:
-                blocked = True
-                reason = f"页面未正常渲染 (status={status}, 缺少 nav-home)"
+            # 等待 SPA 渲染完成（goto 'load' 时 React 可能还没挂载）
+            try:
+                page.wait_for_selector(
+                    '[data-test="nav-home"]', timeout=10000
+                )
+            except Exception:
+                # nav-home 没出现 —— 检查是不是 Cloudflare 拦截
+                body = page.content().lower()
+                if status == 403 and (
+                    "cloudflare" in body or "checking your browser" in body
+                ):
+                    blocked = True
+                    reason = f"Cloudflare 拦截 (status={status})"
+                elif status != 200:
+                    blocked = True
+                    reason = f"站点不可达 (status={status})"
+                else:
+                    blocked = True
+                    reason = f"页面未正常渲染 (status={status}, SPA 未挂载)"
             else:
                 reason = f"站点可达，页面正常渲染 (status={status})"
+
         except Exception as e:
             blocked = True
             reason = f"Playwright 异常: {type(e).__name__}: {e}"
