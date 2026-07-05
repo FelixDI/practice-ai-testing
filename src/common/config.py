@@ -22,16 +22,16 @@ REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "30"))
 
 # 测试用户凭据（从环境变量读取，未设置时使用本地开发默认值）
 # 多环境账号隔离：
-#   本地开发  → config.py 默认值（test-ui-*）
+#   本地开发  → config.py 默认值（test-local-*）
 #   Jenkins   → Jenkinsfile 通过 env 覆盖为 jenkins-ci-*（独立账号，避免并发冲突）
 #   GitHub CI → 只跑 API 测试，token 鉴权，不依赖此账号
 TEST_USER_EMAIL: str = os.getenv(
     "TEST_USER_EMAIL",
-    "test-ui-961111bd@example.com",
+    "test-local-b3dc3d0e@example.com",
 )
 TEST_USER_PASSWORD: str = os.getenv(
     "TEST_USER_PASSWORD",
-    "0rwM3SOHFowHiH3z!X1",
+    "KnCkAugd9AZUrd4x!L1",
 )
 
 # Jenkins 专用测试账号（独立于本地开发，避免并发登录/写入冲突）

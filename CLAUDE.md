@@ -676,6 +676,36 @@ def product(page):
 
 **新增/更换账号流程**：只改 `config.py` 一处，CI 自动生效。
 
+### 破坏性测试账号隔离
+
+> **核心问题**：密码错误、账号锁定、Token 过期等"负面场景"测试自身就会消耗服务端的失败配额。反复运行会导致测试账号被锁，正常用例全部瘫痪。
+
+**原则**：
+
+1. **正常用例用稳定账号** —— P0/P1 的 Happy Path 和一般异常路径使用默认 `TEST_USER_*`
+2. **会触发锁定的测试用独立账号** —— 涉及错误密码、多次 401、登出后 Token 失效等场景，使用专门的"牺牲品"账号
+3. **标记为破坏性测试** —— 自定义 marker：`@pytest.mark.destructive`，日常 `pytest -m "not destructive"` 跳过，CI/上线前审计时全量跑
+
+```python
+# ✅ 破坏性测试示例
+@pytest.mark.destructive
+def test_wrong_password_locks_account(self, destructive_user: dict) -> None:
+    """错误密码达到阈值后账号被锁。使用独立账号，不影响正常测试。"""
+    for _ in range(5):
+        requests.post(f"{API_BASE_URL}/users/login", json={
+            "email": destructive_user["email"],
+            "password": "wrong-password",
+        })
+    # 第 6 次应该返回 locked 状态
+    r = requests.post(f"{API_BASE_URL}/users/login", json={
+        "email": destructive_user["email"],
+        "password": destructive_user["password"],
+    })
+    assert r.status_code == 403
+```
+
+**当前状态**：`test_wrong_password_triggers_server_error`（ProfilePage）已 skip 处理。后续新增破坏性测试时按上述规范执行。
+
 ---
 
 ## 通用编码规范

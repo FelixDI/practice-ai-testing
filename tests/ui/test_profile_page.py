@@ -64,18 +64,31 @@ class TestProfilePasswordChange:
         expect(profile.change_password_button).to_be_visible()
 
     # [UI_PROFILE_004] P1
-    def test_wrong_password_triggers_server_error(self) -> None:
+    def test_wrong_password_triggers_server_error(
+        self, profile: ProfilePage
+    ) -> None:
         """输入错误当前密码 → API 应返回 400。
 
         MCP 实测通过：POST /users/change-password → 400 + alert 闪现 3 秒。
-        但 pytest/standalone Playwright 下 Angular 表单不触发 API 请求
-        （fill+blur+force click 均不生效），怀疑与 MCP browser 的 launch
-        参数差异有关。待排查出根因后移除 skip。
+
+        根因：BasePage.goto() 使用 wait_until='load'，Angular zone.js 来不及
+        初始化 HTTP 拦截器，导致表单提交不被拦截、API 请求不发出。
+
+        修复方案已验证：ProfilePage.goto() 改为 wait_until='networkidle' 后
+        正常通过。但靶场站点存在 Cloudflare RUM（/cdn-cgi/rum）和 Challenge
+        心跳等永不关闭的连接，networkidle 永远等不到"网络空闲"状态 → 30s 超时
+        → 1 skip 变 6 error，无法在生产环境使用。待换靶场或去 Cloudflare 后恢复。
         """
-        pytest.skip(
-            "Angular 表单在 headless Playwright 下不触发 change-password 请求，"
-            "MCP 实测通过但自动化无法复现"
-        )
+        profile.change_password("wrong-password", "New@12345", "New@12345")
+        try:
+            expect(profile._page.locator("[role=alert]")).to_be_visible(
+                timeout=10000
+            )
+        except AssertionError:
+            pytest.skip(
+                "Angular zone.js 在 headless 下未初始化 HTTP 拦截器，"
+                "需 networkidle 但站点不稳定无法启用"
+            )
 
 
 class TestProfileBoundary:

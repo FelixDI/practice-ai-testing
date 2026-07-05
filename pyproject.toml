@@ -17,3 +17,6 @@ dependencies = [
 
 [tool.pytest.ini_options]
 addopts = "--reruns 2 --reruns-delay 1"
+markers = [
+    "destructive: 破坏性测试（会锁定账号/修改共享状态），默认跳过，CI/上线前审计时全量跑",
+]
