@@ -23,11 +23,11 @@ REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "30"))
 # 测试用户凭据（从环境变量读取，未设置时使用默认演示账号）
 TEST_USER_EMAIL: str = os.getenv(
     "TEST_USER_EMAIL",
-    "customer@practicesoftwaretesting.com",
+    "test-ui-961111bd@example.com",
 )
 TEST_USER_PASSWORD: str = os.getenv(
     "TEST_USER_PASSWORD",
-    "welcome01",
+    "0rwM3SOHFowHiH3z!X1",
 )
 
 # 管理员账号（报表等管理端接口）
