@@ -67,30 +67,28 @@ pipeline {
         }
 
         // ----------------------------------------------------------------
-        // 3. UI 测试（检测 Cloudflare）
+        // 3. UI 测试（Playwright 实测可达性，非 curl）
         // ----------------------------------------------------------------
         stage('UI Tests') {
             when { expression { env.SKIP_TESTS != 'true' } }
             steps {
                 script {
+                    // 安装 Chromium（检测和测试都需要）
+                    sh 'uv run playwright install chromium'
+
+                    // Playwright 实测：导航 + 等待 nav-home 渲染
                     def blocked = sh(
-                        script: '''
-                            STATUS=$(curl -sI -o /dev/null -w "%{http_code}" https://practicesoftwaretesting.com/ --max-time 10)
-                            BODY=$(curl -s https://practicesoftwaretesting.com/ --max-time 10 | head -5)
-                            if echo "$BODY" | grep -qiE "cloudflare|checking your browser|403.*denied"; then
-                                echo "blocked"
-                            elif [ "$STATUS" != "200" ]; then
-                                echo "blocked"
-                            else
-                                echo "ok"
-                            fi
-                        ''',
+                        script: 'uv run python scripts/check_site_reachability.py',
                         returnStdout: true
                     ).trim()
 
-                    if (blocked == 'ok') {
+                    // 脚本输出最后一行为判定结果，含 "blocked=true" 或 "blocked=false"
+                    // 直接检查输出是否含 blocked=true
+                    if (blocked.contains('blocked=true')) {
+                        echo "⚠️ ${blocked}"
+                    } else {
+                        echo "✅ ${blocked}"
                         sh '''
-                            uv run playwright install chromium
                             uv run pytest tests/ui \
                                 -v \
                                 --tb=line \
@@ -100,8 +98,6 @@ pipeline {
                                 || true
                         '''
                         stash includes: 'allure-results-ui/**', name: 'ui-results'
-                    } else {
-                        echo '⚠️ 站点被 Cloudflare 拦截，跳过 UI 测试'
                     }
                 }
             }

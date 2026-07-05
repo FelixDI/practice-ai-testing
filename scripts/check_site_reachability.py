@@ -62,7 +62,9 @@ def main() -> int:
         with open(github_output, "a") as f:
             f.write(f"blocked={'true' if blocked else 'false'}\n")
 
+    # stdout 供 CI（Jenkins / 通用）解析
     print(reason)
+    print(f"blocked={'true' if blocked else 'false'}")
     return 0
 
 
