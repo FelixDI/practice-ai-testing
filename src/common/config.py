@@ -34,9 +34,10 @@ TEST_USER_PASSWORD: str = os.getenv(
     "0rwM3SOHFowHiH3z!X1",
 )
 
-# Jenkins 专用测试账号（供 Jenkinsfile 环境变量注入，统一在此维护）
-# JENKINS_EMAIL = "jenkins-ci-f73dce88@example.com"
-# JENKINS_PASSWORD = "QCOCIxFX4-PhLPUK!J1"
+# Jenkins 专用测试账号（独立于本地开发，避免并发登录/写入冲突）
+# 供 Jenkinsfile 通过 `uv run python -c "from src.common.config import ..."` 读取
+JENKINS_TEST_EMAIL = "jenkins-ci-f73dce88@example.com"
+JENKINS_TEST_PASSWORD = "QCOCIxFX4-PhLPUK!J1"
 
 # 管理员账号（报表等管理端接口）
 ADMIN_EMAIL: str = os.getenv(

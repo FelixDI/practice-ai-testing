@@ -3,9 +3,6 @@ pipeline {
 
     environment {
         PATH = "${HOME}/.local/bin:${PATH}"
-        // Jenkins 专用测试账号，覆盖 config.py 默认值。凭据统一在 config.py 注释中维护
-        TEST_USER_EMAIL = "jenkins-ci-f73dce88@example.com"
-        TEST_USER_PASSWORD = "QCOCIxFX4-PhLPUK!J1"
     }
 
     stages {
@@ -43,6 +40,17 @@ pipeline {
                     curl -LsSf https://astral.sh/uv/install.sh | sh
                     uv sync
                 '''
+                // 从 config.py 读取 Jenkins 专用账号，注入环境变量（凭据统一在 config.py 维护）
+                script {
+                    env.TEST_USER_EMAIL = sh(
+                        script: '''uv run python -c "from src.common.config import JENKINS_TEST_EMAIL; print(JENKINS_TEST_EMAIL)"''',
+                        returnStdout: true
+                    ).trim()
+                    env.TEST_USER_PASSWORD = sh(
+                        script: '''uv run python -c "from src.common.config import JENKINS_TEST_PASSWORD; print(JENKINS_TEST_PASSWORD)"''',
+                        returnStdout: true
+                    ).trim()
+                }
             }
         }
 
