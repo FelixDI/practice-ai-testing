@@ -672,7 +672,7 @@ def product(page):
 **设计原则**：
 1. **唯一数据源** —— 所有环境的账号凭据统一在 `config.py` 中维护，CI 配置文件不硬编码凭据
 2. **环境变量桥接** —— CI 通过 `uv run python -c "from config import ..."` 动态读取，不复制粘贴
-3. **兜底安全** —— `os.getenv()` 读不到时 fallback 到本地默认值，不会因 CI 配置缺失而炸
+3. **Fallback 仅限本地** —— `os.getenv("TEST_USER_EMAIL")` 的 fallback 值仅供本地开发。Jenkins 必须在 Setup 阶段从 `config.py` 读取 `JENKINS_TEST_EMAIL` 常量并注入为环境变量，注入失败就停掉 pipeline。禁止降级到本地 fallback
 
 **新增/更换账号流程**：只改 `config.py` 一处，CI 自动生效。
 

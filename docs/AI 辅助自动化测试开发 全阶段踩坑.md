@@ -415,4 +415,155 @@ CLAUDE.md 完善后：AI 几乎不再犯已知规约错误
 
 真正的效率提升不是”AI 变得更聪明了”，而是”AI 踩过的坑不会再踩第二遍”。
 
+---
+
+# 第六阶段：测试工程化 —— 从”能跑”到”企业级”
+
+## 问题 15：Playwright MCP 调用策略与 CLAUDE.md 强制执行冲突
+
+**现象**：CLAUDE.md 规定”新建 Page Object 必须用 MCP 验证”，但 memory 文件规定”调用 MCP 前必须先征得用户同意”。两条规则互相矛盾，AI 每次新建页面都陷入两难。
+
+**根因分析**：
+
+CLAUDE.md 写于”发现 MCP 好用、推全员强制执行”的阶段；memory 写于后来发现”每次调用 DOM 快照消耗大量 token”的阶段。两条规则没有协调——一个说”必须调”，一个说”先问再调”。
+
+**解决方案**：
+
+1. CLAUDE.md 改为分层策略：**首次探索用 MCP（保存快照供复用）→ 日常开发优先复用已有快照和文档 → 反复修不好的 Bug 时才再调 MCP**
+2. memory 文件同步更新，消除冲突
+3. MCP 不再是”每次必调”，而是”按需调用”
+
+**效果**：AI 行为一致，不再纠结是否调用；token 消耗大幅降低。
+
+---
+
+## 问题 16：测试账号频繁被锁——本地/CI 共用同一个账号
+
+**现象**：本地测试和 Jenkins CI 使用同一个测试账号。错误密码测试反复跑 → 登录失败次数超阈值 → 账号被锁 → 所有依赖登录的测试全炸。
+
+**根因分析**：
+
+这是测试工程化的典型问题——多环境共享同一套凭据。错误密码测试自身就消耗失败配额，每跑一次就离锁定更近一步。
+
+**解决方案**：
+
+1. **三环境账号隔离**：本地 `test-local-*`、Jenkins `jenkins-ci-*`、GitHub Actions（预留 `GHA_TEST_*`）
+2. **唯一数据源**：所有凭据统一在 `config.py` 中维护，Jenkinsfile 通过 `uv run python -c “from config import JENKINS_TEST_EMAIL”` 动态读取
+3. **环境变量桥接**：CI 通过 `env.TEST_USER_EMAIL` 覆盖默认值，不硬编码凭据
+
+**设计原则**：本地开发不设环境变量，`os.getenv("TEST_USER_EMAIL")` 取不到就走 fallback 拿本地 `TEST_USER_EMAIL` 常量值。Jenkins 在 Setup 阶段从 `config.py` 读取 **`JENKINS_TEST_EMAIL`** 常量，注入为环境变量 `TEST_USER_EMAIL` 覆盖 fallback。注入失败就报错停掉 pipeline。**禁止 CI 注入失败后静默降级到本地 fallback**——这会把 CI 的故障（Jenkins 账号过期）转嫁成本地账号被锁。
+
+---
+
+## 问题 17：破坏性测试与正常测试的账号分离
+
+**现象**：`test_wrong_password_triggers_server_error` 输入错误密码 → 服务端累计失败次数 → 账号被锁 → 5 条正常用例跟着瘫痪。1 条 skip 变 6 error。
+
+**根因分析**：
+
+密码错误、多次 401、Token 过期等”负面场景”测试自身就会消耗服务端的失败配额。这跟”被测系统有 Bug”完全不同——这是测试代码的正常行为导致了测试基础设施的崩溃。
+
+**解决方案**：
+
+1. **正常用例用稳定账号** —— Happy Path 和一般异常路径使用默认 `TEST_USER_*`
+2. **会触发锁定的测试用独立”牺牲品”账号** —— 用完即弃
+3. **标记为破坏性测试** —— `@pytest.mark.destructive`，日常 `pytest -m “not destructive”` 跳过，CI/上线前审计时全量跑
+4. CLAUDE.md 新增”破坏性测试账号隔离”规范 + `pyproject.toml` 注册 marker
+
+---
+
+## 问题 18：Angular zone.js HTTP 拦截器与 Playwright wait_until 的死锁
+
+**现象**：ProfilePage 错误密码测试在 MCP 浏览器中正常通过（API 返回 400 + alert 闪现），但在 pytest/standalone Playwright 中表单完全不触发 API 请求。fill/blur/force click/dispatchEvent 均无效。
+
+**排查过程**：
+
+| 步骤 | 假设 | 结果 |
+|------|------|------|
+| 1 | 密码强度不够 | ❌ 改用强密码仍不行 |
+| 2 | click 未触发 | ❌ force click 也不行 |
+| 3 | headless 模式差异 | ❌ headless=False 也不行 |
+| 4 | launch args 差异 | ❌ 无关 |
+| 5 | `fill()` vs `type()` | ❌ 无关 |
+| 6 | **`wait_until='load'` → Angular zone.js 未初始化** | ✅ **根因** |
+
+**根因链**：
+
+```
+BasePage.goto(wait_until='load')
+  → DOM 就绪，但 Angular zone.js 来不及初始化
+  → HTTP 拦截器（XHR/fetch 代理）未生效
+  → fill() 填表 + click() 提交 → 表单值变化但 Angular 不拦截
+  → 请求不发，API 不调用
+```
+
+**修复方案已验证**：`ProfilePage.goto()` 改为 `wait_until='networkidle'` → standalone 和 pytest 均通过 ✅
+
+**但 networkidle 不能用于生产**：靶场站点存在 Cloudflare RUM（`/cdn-cgi/rum`）和 Challenge 心跳等永不关闭的连接，`networkidle` 永远等不到”网络空闲”状态 → 30s 超时 → 1 skip 变 6 error。
+
+**最终决策**：保留 `wait_until='load'`，错误密码测试 try/except skip 兜底。docstring 完整记录根因 + 修复方案 + 不可用原因，待换靶场或去 Cloudflare 后恢复。
+
+---
+
+## 问题 19：CI 工程化——测试凭据统一管理 vs 散落各处
+
+**现象**：Jenkinsfile 中硬编码了 Jenkins 专用账号，config.py 有自己的本地账号，两处各管各的。一旦需要换账号，要改两个文件。
+
+**根因分析**：
+
+凭据散落在 CI 配置文件中的本质原因是：CI 配置语言（Groovy/YAML）和 Python 代码之间没有桥接机制。
+
+**解决方案**：
+
+1. **config.py 作为唯一数据源**：所有环境的账号凭据集中定义
+   ```python
+   TEST_USER_EMAIL = os.getenv(“TEST_USER_EMAIL”, “本地默认值”)
+   JENKINS_TEST_EMAIL = “jenkins-ci-xxx@example.com”  # Jenkins 专用
+   # GHA_TEST_EMAIL = “...”  # GitHub Actions 预留
+   ```
+2. **Jenkinsfile 通过 Python 桥接读取**：
+   ```groovy
+   env.TEST_USER_EMAIL = sh(
+       script: '''uv run python -c “from config import JENKINS_TEST_EMAIL; print(JENKINS_TEST_EMAIL)”''',
+       returnStdout: true
+   ).trim()
+   ```
+3. **新增/更换账号只改 config.py 一处**，CI 自动生效
+
+---
+
+## 第六阶段工程规范总汇
+
+| 规范类别 | 规范内容 | 解决的问题 |
+|---------|---------|----------|
+| MCP 调用策略 | 首次探索用 MCP → 日常复用快照 → Bug 调试才再调 | MCP 规则冲突 + token 浪费 |
+| 多环境账号隔离 | 本地/Jenkins/GHA 三环境各自独立账号，config.py 唯一数据源 | 并发登录冲突、互相踢下线 |
+| 破坏性测试隔离 | 正常测试 stable 账号 + 破坏性测试 sacrificial 账号 + `@pytest.mark.destructive` | 错误密码测试导致账号被锁，正常用例瘫痪 |
+| CI 凭据统一管理 | config.py 集中定义 → CI 通过 `uv run python` 动态读取 → 环境变量注入 | 凭据散落多处，换号改多个文件 |
+| Angular zone.js 陷阱 | `wait_until='load'` 下 Angular HTTP 拦截器未初始化，需 `networkidle` 但 Cloudflare 阻止 | 表单提交不触发 API 请求 |
+| _is_cloudflare 提取 | 4 个测试文件重复定义 → `tests/ui/conftest.py` 统一共享 | 代码重复，维护分散 |
+| CLAUDE.md 规则维护 | 定期审计 CLAUDE.md 与实际代码的一致性（组件列表、目录结构、CI 触发路径） | 文档腐烂，误导后续开发 |
+
+## 踩坑经验总结（第六阶段新增）
+
+- **测试账号是消耗品，不是常量**：错误密码测试每跑一次就消耗一次失败配额。正常测试和破坏性测试必须账号隔离
+- **网络空闲不是银弹**：`networkidle` 在有持续连接的站点（Cloudflare RUM）上永远等不到，成也它败也它
+- **凭据统一管理是工程化第一课**：一个配置文件 → CI 动态读取 → 环境变量注入，三级桥接比硬编码多 10 分钟但省 10 天排查
+- **Angular SPA + Playwright = 隐形陷阱**：`wait_until='load'` 下 zone.js 可能来不及初始化，表现为”表单填了但 API 不触发”的诡异 bug
+- **MCP 是利器但非必备**：首次探索时用一次保存快照，后续靠快照+文档+代码就能完成大部分工作。省 token 的同时保持开发效率
+- **CLAUDE.md 需要定期审计**：文档与代码必须一致。组件列表、目录结构、CI 路径——任何一处不一致都会误导后续所有开发
+
+---
+
+## 第六阶段流程范式更新
+
+| 阶段 | 发现的问题 | 约束到 CLAUDE.md | 效果 |
+|------|------|------|------|
+| **工程化** | **MCP 调用策略与 CLAUDE.md 冲突** | MCP 分层策略（首次探索/日常复用/Bug 调试） | AI 行为一致，token 消耗降低 |
+| **工程化** | **本地/Jenkins 共用账号导致频繁锁定** | 多环境账号隔离 + config.py 唯一数据源 | 独立隔离，互不干扰 |
+| **工程化** | **错误密码测试消耗失败配额** | 破坏性测试账号隔离 + `@pytest.mark.destructive` | 正常测试再也不被连带炸毁 |
+| **工程化** | **Jenkinsfile 硬编码凭据** | CI 通过 `uv run python -c` 从 config.py 动态读取 | 换号只改一处 |
+| **工程化** | **Angular zone.js + load + Cloudflare 死锁** | ProfilePage 测试 docstring 完整记录 | 有据可查，条件成熟时一分钟恢复 |
+| **工程化** | **_is_cloudflare 4 处重复** | 提取到 tests/ui/conftest.py 共享 | 代码不重复 |
+
 ```
