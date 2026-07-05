@@ -153,18 +153,27 @@ pipeline {
                     '''
                 }
 
-                // 推送到 gh-pages
+                // 推送到 gh-pages（含重试，GitHub Pages 偶发不可用）
                 withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
-                    sh '''
-                        cd _site
-                        git init
-                        git config user.name  "Jenkins CI"
-                        git config user.email "jenkins@ci.local"
-                        git checkout -b gh-pages
-                        git add .
-                        git commit -m "Allure report [${BUILD_NUMBER}]" || true
-                        git push -f "https://${GH_TOKEN}@github.com/FelixDI/practice-ai-testing.git" gh-pages
-                    '''
+                    script {
+                        def attempts = 0
+                        retry(3) {
+                            if (attempts > 0) {
+                                sleep(time: 10, unit: 'SECONDS')
+                            }
+                            attempts++
+                            sh '''
+                                cd _site
+                                git init
+                                git config user.name  "Jenkins CI"
+                                git config user.email "jenkins@ci.local"
+                                git checkout -b gh-pages
+                                git add .
+                                git commit -m "Allure report [${BUILD_NUMBER}]" || true
+                                git push -f "https://${GH_TOKEN}@github.com/FelixDI/practice-ai-testing.git" gh-pages
+                            '''
+                        }
+                    }
                 }
             }
         }
