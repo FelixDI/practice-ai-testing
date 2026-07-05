@@ -71,6 +71,17 @@ docs/
 | 被测试的页面/路由当前可访问 | 浏览器打开或 API HEAD 请求返回 2xx | 页面正常渲染，非空白/500 |
 | 所使用的测试账号对目标端点有正确权限 | 用该账号调用目标 API | 返回 200（非 401/403） |
 
+> **特别约束：商品 ID 禁止硬编码。** 商品数据会被服务端周期性重建，ID 全部变化（已实际发生过两次：`01KWQ4...` → `01KWR3...` → `01KWRR...`）。任何需要商品 ID 的 fixture 必须从 API 动态获取首个有效 ID，不得硬编码：
+>
+> ```python
+> # ✅ fixture 中动态获取商品 ID
+> def _fetch_valid_product_id() -> str:
+>     r = requests.get(f"{API_BASE_URL}/products?page=1", timeout=10)
+>     return r.json()["data"][0]["id"]
+>
+> # ❌ VALID_ID = "01KWR3GEF7T1HCXQXC111YATDY"  # 迟早过期
+> ```
+
 ### ② 账号权限预检（API 测试专用）
 
 **为什么**：Report API 使用 `customer@...`（非管理员）写全套测试 → 15 条全部因 403 skip，写了等于没写。
