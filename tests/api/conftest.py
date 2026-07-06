@@ -132,6 +132,25 @@ def registered_user(user_client: UserClient) -> Generator[dict[str, Any]]:
 
 
 @pytest.fixture
+def destructive_user(user_client: UserClient) -> Generator[dict[str, Any]]:
+    """注册一个"牺牲品"用户，供破坏性测试使用。
+
+    与 registered_user 的区别：此 fixture 语义明确为"这个账号会被玩坏"——
+    测试可以随意错误密码、触发锁定、删除账号，不影响正常共享账号。
+    每次 function 级新注册，用完即弃。
+    """
+    payload = new_user_data()
+    r = user_client.post("/users/register", json=payload)
+    assert r.status_code == 201, f"destructive_user 注册失败: {r.status_code} {r.text}"
+    user = r.json()
+    yield {
+        "email": payload["email"],
+        "password": payload["password"],
+        "user_id": user["id"],
+    }
+
+
+@pytest.fixture
 def authenticated_user(
     user_client: UserClient, registered_user: dict[str, Any]
 ) -> Generator[dict[str, Any]]:

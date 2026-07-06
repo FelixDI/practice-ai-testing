@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from playwright.sync_api import Page, expect
 
@@ -22,6 +24,31 @@ def profile(page: Page) -> ProfilePage | None:
     expect(lp.login_form).to_be_visible(timeout=30000)
     lp.fill_email(TEST_USER_EMAIL)
     lp.fill_password(TEST_USER_PASSWORD)
+    with page.expect_navigation():
+        lp.submit()
+    pp = ProfilePage(page)
+    pp.goto()
+    try:
+        expect(pp.page_title).to_be_visible(timeout=30000)
+    except AssertionError:
+        pytest.fail("page-title 不可见——请检查选择器或页面结构")
+    except TimeoutError:
+        pytest.skip("个人资料页渲染超时（30s），环境异常")
+    return pp
+
+
+@pytest.fixture
+def destructive_profile(page: Page, destructive_user: dict[str, Any]) -> ProfilePage | None:
+    """用牺牲品账号登录后进入个人资料页（破坏性测试专用）。
+
+    与 profile fixture 的区别：使用 destructive_user（每次新注册），
+    而非共享的 TEST_USER_*。即使被错误密码锁定也不影响正常测试。
+    """
+    lp = LoginPage(page)
+    lp.goto()
+    expect(lp.login_form).to_be_visible(timeout=30000)
+    lp.fill_email(destructive_user["email"])
+    lp.fill_password(destructive_user["password"])
     with page.expect_navigation():
         lp.submit()
     pp = ProfilePage(page)
@@ -64,10 +91,13 @@ class TestProfilePasswordChange:
         expect(profile.change_password_button).to_be_visible()
 
     # [UI_PROFILE_004] P1
+    @pytest.mark.destructive
     def test_wrong_password_triggers_server_error(
-        self, profile: ProfilePage
+        self, destructive_profile: ProfilePage
     ) -> None:
         """输入错误当前密码 → API 应返回 400。
+
+        使用 destructive_user（牺牲品账号），不影响共享 TEST_USER_*。
 
         MCP 实测通过：POST /users/change-password → 400 + alert 闪现 3 秒。
 
@@ -79,9 +109,9 @@ class TestProfilePasswordChange:
         心跳等永不关闭的连接，networkidle 永远等不到"网络空闲"状态 → 30s 超时
         → 1 skip 变 6 error，无法在生产环境使用。待换靶场或去 Cloudflare 后恢复。
         """
-        profile.change_password("wrong-password", "New@12345", "New@12345")
+        destructive_profile.change_password("wrong-password", "New@12345", "New@12345")
         try:
-            expect(profile._page.locator("[role=alert]")).to_be_visible(
+            expect(destructive_profile._page.locator("[role=alert]")).to_be_visible(
                 timeout=10000
             )
         except AssertionError:

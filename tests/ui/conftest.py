@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 import requests
 from playwright.sync_api import BrowserContext, Page
 
 from src.common.config import API_BASE_URL, UI_BASE_URL
+from src.common.data_factory import new_user_data
 
 
 @pytest.fixture(scope="session")
@@ -46,3 +49,25 @@ def fetch_valid_product_id() -> str:
     if not data:
         pytest.skip("商品 API 返回空列表，无可用商品")
     return data[0]["id"]
+
+
+@pytest.fixture
+def destructive_user() -> dict[str, Any]:
+    """注册一个"牺牲品"用户，供 UI 破坏性测试使用。
+
+    通过 API 注册（非 UI 流程），返回 email/password/user_id。
+    测试可以随意错误密码、触发锁定，不影响 TEST_USER_* 固定账号。
+    """
+    payload = new_user_data()
+    r = requests.post(
+        f"{API_BASE_URL}/users/register",
+        json=payload,
+        timeout=30,
+    )
+    assert r.status_code == 201, f"destructive_user 注册失败: {r.status_code} {r.text}"
+    user: dict[str, Any] = r.json()
+    return {
+        "email": payload["email"],
+        "password": payload["password"],
+        "user_id": user["id"],
+    }
