@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import uuid
+from src.common.data_factory import generate_unique_slug
 
 import pytest
 
@@ -19,7 +19,7 @@ def client() -> CategoryClient:
 
 
 def _create_category(client: CategoryClient, name: str = "E2E Cat", slug: str | None = None, parent_id: str | None = None) -> dict:
-    slug = slug or f"e2e-cat-{uuid.uuid4().hex[:8]}"
+    slug = slug or generate_unique_slug("e2e-cat")
     body: dict = {"name": name, "slug": slug}
     if parent_id:
         body["parent_id"] = parent_id
@@ -81,7 +81,7 @@ class TestGetCategoryTree:
 class TestCreateCategory:
     # [API_CATEGORY_005]
     def test_create_top_level_201(self, client: CategoryClient) -> None:
-        slug = f"top-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("top")
         r = client.post("/categories", json={"name": "Top Cat", "slug": slug})
         assert r.status_code in (200, 201), f"意外: {r.status_code}"
         d = r.json()
@@ -91,14 +91,14 @@ class TestCreateCategory:
     def test_create_with_parent_id(self, client: CategoryClient) -> None:
         cats = client.get("/categories").json()
         parent_id = cats[0]["id"]
-        slug = f"child-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("child")
         r = client.post("/categories", json={"name": "Child Cat", "slug": slug, "parent_id": parent_id})
         assert r.status_code in (200, 201), f"意外: {r.status_code}"
         assert r.json()["parent_id"] == parent_id
 
     # [API_CATEGORY_007]
     def test_create_invalid_parent_id(self, client: CategoryClient) -> None:
-        slug = f"badparent-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("badparent")
         r = client.post("/categories", json={"name": "Bad Parent", "slug": slug, "parent_id": "nonexistent-99999"})
         assert r.status_code in (200, 201, 422, 500), f"意外: {r.status_code}"
 
@@ -114,7 +114,7 @@ class TestCreateCategory:
 
     # [API_CATEGORY_010]
     def test_duplicate_slug_409(self, client: CategoryClient) -> None:
-        slug = f"dupcat-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("dupcat")
         _create_category(client, slug=slug)
         r = client.post("/categories", json={"name": "Dup Cat", "slug": slug})
         assert r.status_code == 409, f"期望409, 实际{r.status_code}"
@@ -248,20 +248,20 @@ class TestCategoryBoundary:
 
     # [API_CATEGORY_025]
     def test_name_empty_string_422(self, client: CategoryClient) -> None:
-        r = client.post("/categories", json={"name": "", "slug": f"empty-{uuid.uuid4().hex[:8]}"})
+        r = client.post("/categories", json={"name": "", "slug": generate_unique_slug("empty")})
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_CATEGORY_026]
     def test_parent_id_self_reference_422(self, client: CategoryClient) -> None:
-        c = _create_category(client, slug=f"selfref-{uuid.uuid4().hex[:8]}")
-        r = client.post("/categories", json={"name": "Self Ref", "slug": f"child-{uuid.uuid4().hex[:8]}", "parent_id": c["id"]})
+        c = _create_category(client, slug=generate_unique_slug("selfref"))
+        r = client.post("/categories", json={"name": "Self Ref", "slug": generate_unique_slug("child"), "parent_id": c["id"]})
         assert r.status_code in (200, 201, 422), f"意外: {r.status_code}"
 
     # [API_CATEGORY_027]
     def test_three_level_nesting_201(self, client: CategoryClient) -> None:
-        l1 = _create_category(client, slug=f"l1-{uuid.uuid4().hex[:8]}")
-        l2 = _create_category(client, slug=f"l2-{uuid.uuid4().hex[:8]}", parent_id=l1["id"])
-        l3_slug = f"l3-{uuid.uuid4().hex[:8]}"
+        l1 = _create_category(client, slug=generate_unique_slug("l1"))
+        l2 = _create_category(client, slug=generate_unique_slug("l2"), parent_id=l1["id"])
+        l3_slug = generate_unique_slug("l3")
         r = client.post("/categories", json={"name": "Level 3", "slug": l3_slug, "parent_id": l2["id"]})
         assert r.status_code in (200, 201), f"意外: {r.status_code}"
         d = r.json()
@@ -269,8 +269,8 @@ class TestCategoryBoundary:
 
     # [API_CATEGORY_028]
     def test_put_slug_conflict_409(self, client: CategoryClient) -> None:
-        slug_a = f"cata-{uuid.uuid4().hex[:8]}"
-        slug_b = f"catb-{uuid.uuid4().hex[:8]}"
+        slug_a = generate_unique_slug("cata")
+        slug_b = generate_unique_slug("catb")
         _create_category(client, name="Cat A", slug=slug_a)
         b = _create_category(client, name="Cat B", slug=slug_b)
         r = client.put(f"/categories/{b['id']}", json={"name": "Cat A", "slug": slug_a})
@@ -301,7 +301,7 @@ class TestCategoryAuthGaps:
     # [API_CATEGORY_031] P1
     def test_post_unauthenticated_401(self) -> None:
         cc = CategoryClient()
-        slug = f"unauth-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("unauth")
         r = cc.post("/categories", json={"name": "X", "slug": slug})
         assert r.status_code in (200, 201, 401), f"意外: {r.status_code}（公开环境可能无需认证）"
 
@@ -322,7 +322,7 @@ class TestCategoryBoundaryGaps:
 
     # [API_CATEGORY_033] P2
     def test_name_overlong_422(self, client: CategoryClient) -> None:
-        slug = f"cat-bndry-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("cat-bndry")
         r = client.post("/categories", json={"name": "A" * 256, "slug": slug})
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 

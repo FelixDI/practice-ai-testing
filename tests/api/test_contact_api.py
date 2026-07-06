@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import os
 import tempfile
-import uuid
 
 import pytest
 
 from src.api.client.contact_client import ContactClient
 from src.api.client.user_client import UserClient
 from src.common.config import TEST_USER_EMAIL, TEST_USER_PASSWORD
+from tests.conftest import generate_unique_email
 
 
 # -- module 级夹具 --------------------------------------------------------
@@ -65,7 +65,7 @@ def _auth_contact() -> ContactClient:
 def _send_message(client: ContactClient) -> str:
     """提交留言并返回 message_id。"""
     r = client.send_message({
-        "name": "Test User", "email": f"test-{uuid.uuid4().hex[:6]}@example.com",
+        "name": "Test User", "email": generate_unique_email("test", domain="example.com"),
         "subject": "Test Subject", "message": "Test message body.",
     })
     assert r.status_code == 200, f"prep send message failed: {r.status_code} {r.text}"
@@ -538,7 +538,7 @@ class TestContactDefense:
     def test_non_admin_get_single_message(self, _mod_message_id: str) -> None:
         """非管理员用户查看单条留言。"""
         with UserClient() as uc:
-            email = f"normal-{uuid.uuid4().hex[:8]}@e2e.example"
+            email = generate_unique_email("normal")
             uc.register({
                 "first_name": "Normal", "last_name": "User",
                 "email": email, "password": "Str0ng!Pass",

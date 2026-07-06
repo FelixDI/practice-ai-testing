@@ -6,10 +6,6 @@
 
 from __future__ import annotations
 
-import uuid
-from collections.abc import Generator
-from typing import Any
-
 import pytest
 
 from src.api.client.brand_client import BrandClient
@@ -24,6 +20,7 @@ from src.api.client.report_client import ReportClient
 from src.api.client.totp_client import TOTPClient
 from src.api.client.user_client import UserClient
 from src.common.config import TEST_USER_EMAIL, TEST_USER_PASSWORD
+from src.common.data_factory import generate_unique_email, new_user_data
 
 
 # ---------------------------------------------------------------------------
@@ -121,27 +118,13 @@ def registered_user(user_client: UserClient) -> Generator[dict[str, Any]]:
         - user_id: 用户 ID
         - first_name / last_name
     """
-    email = f"test-{uuid.uuid4().hex[:8]}@e2e.example"
-    password = "Str0ng!Pass"
-    payload: dict[str, Any] = {
-        "first_name": "PyTest",
-        "last_name": "Runner",
-        "email": email,
-        "password": password,
-        "address": {
-            "street": "Teststr.",
-            "city": "Berlin",
-            "country": "DE",
-            "postal_code": "10115",
-        },
-        "dob": "1990-01-01",
-    }
+    payload = new_user_data(address_city="Berlin")
     response = user_client.post("/users/register", json=payload)
     assert response.status_code == 201, f"注册失败: {response.status_code} {response.text}"
     user = response.json()
     yield {
-        "email": email,
-        "password": password,
+        "email": payload["email"],
+        "password": payload["password"],
         "user_id": user["id"],
         "first_name": payload["first_name"],
         "last_name": payload["last_name"],

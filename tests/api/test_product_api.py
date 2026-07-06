@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import uuid
+from src.common.data_factory import generate_unique_product_name, unique_id
 from typing import Any
 
 import pytest
@@ -104,7 +104,7 @@ def _get_create_context(client: ProductClient) -> dict[str, Any]:
 def _create_product(client: ProductClient, **overrides: Any) -> dict[str, Any]:
     ctx = _get_create_context(client)
     body: dict[str, Any] = {
-        "name": f"E2E Product {uuid.uuid4().hex[:6]}",
+        "name": generate_unique_product_name(),
         "description": "Auto-generated test product",
         "price": 19.99,
         "brand_id": ctx["brand_id"],
@@ -267,7 +267,7 @@ class TestCreateProduct:
     def create_payload(self, client: ProductClient) -> dict[str, Any]:
         ctx = _get_create_context(client)
         return {
-            "name": f"E2E {uuid.uuid4().hex[:6]}",
+            "name": generate_unique_product_name("E2E"),
             "description": "Test created by automation",
             "price": 29.99,
             "brand_id": ctx["brand_id"],
@@ -527,7 +527,7 @@ class TestProductDefense:
         self, client: ProductClient, _mod_create_ctx: dict[str, Any],
     ) -> None:
         r = client.post("/products", json={
-            "name": f"XSS-Test-{uuid.uuid4().hex[:6]}",
+            "name": f"XSS-Test-{unique_id(6)}",
             "description": "<script>alert(1)</script>",
             "price": 9.99,
             "is_location_offer": True,

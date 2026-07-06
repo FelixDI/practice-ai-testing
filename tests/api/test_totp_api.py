@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-import uuid
+from src.common.data_factory import generate_unique_email
 
 import pyotp
 import pytest
@@ -21,7 +21,7 @@ from src.api.client.user_client import UserClient
 
 def _register_and_login() -> tuple[UserClient, str, str]:
     """注册新用户并登录，返回 (UserClient, email, token)。"""
-    email = f"totp-{uuid.uuid4().hex[:8]}@e2e.example"
+    email = generate_unique_email("totp")
     uc = UserClient()
     uc.post("/users/register", json={
         "first_name": "TOTP", "last_name": "Test",
@@ -248,11 +248,10 @@ class TestTOTPDefense:
     def test_cross_user_token_verify(self, _mod_totp_data: dict) -> None:
         """用户 A 的 totp + 用户 B 的 access_token → 400。"""
         secret: str = _mod_totp_data["secret"]
-        import uuid
         from src.api.client.user_client import UserClient
 
         with UserClient() as uc:
-            email = f"cross-totp-{uuid.uuid4().hex[:8]}@e2e.example"
+            email = generate_unique_email("cross-totp")
             uc.post("/users/register", json={
                 "first_name": "Cross", "last_name": "TOTP",
                 "email": email, "password": "Str0ng!Pass",

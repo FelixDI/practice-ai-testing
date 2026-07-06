@@ -5,13 +5,12 @@
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 from playwright.sync_api import Page, expect
 
 from src.ui.pages.login_page import LoginPage
 from src.common.config import TEST_USER_EMAIL, TEST_USER_PASSWORD
+from src.common.data_factory import generate_unique_email
 
 
 @pytest.fixture
@@ -54,7 +53,7 @@ class TestLoginFailure:
 
     # [UI_LOGIN_004] P1
     def test_nonexistent_email_shows_error(self, login_page: LoginPage) -> None:
-        random_email = f"no-such-user-{uuid.uuid4().hex[:8]}@example.com"
+        random_email = generate_unique_email("no-such-user", domain="example.com")
         login_page.fill_email(random_email)
         login_page.fill_password("some-password-123")
         login_page.submit()

@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Generator
 from typing import Any
 
@@ -311,7 +310,7 @@ class TestGuestInvoice:
             "payment_method": "cash-on-delivery",
             "payment_details": {},
             "cart_id": _mod_cart["cart_id"],
-            "guest_email": f"guest-{uuid.uuid4().hex[:6]}@example.com",
+            "guest_email": generate_unique_email("guest", domain="example.com"),
             "guest_first_name": "Guest",
             "guest_last_name": "User",
         }

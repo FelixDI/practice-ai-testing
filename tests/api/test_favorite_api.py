@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-import uuid
+from src.common.data_factory import generate_unique_email
 
 import pytest
 
@@ -318,7 +318,7 @@ class TestFavoriteDefense:
         """用户 B 查看用户 A 的收藏：实测 API 不校验所有权，返回 200。"""
         _, fav_id, _ = _mod_auth_fav
         with UserClient() as uc:
-            email = f"cross-{uuid.uuid4().hex[:8]}@e2e.example"
+            email = generate_unique_email("cross")
             uc.register({
                 "first_name": "Cross", "last_name": "User",
                 "email": email, "password": "Str0ng!Pass",
@@ -338,7 +338,7 @@ class TestFavoriteDefense:
         """用户 B 删除用户 A 的收藏：实测 DELETE 幂等返回 204。"""
         _, fav_id, _ = _mod_auth_fav
         with UserClient() as uc:
-            email = f"cross-{uuid.uuid4().hex[:8]}@e2e.example"
+            email = generate_unique_email("cross")
             uc.register({
                 "first_name": "Cross", "last_name": "User",
                 "email": email, "password": "Str0ng!Pass",
@@ -374,7 +374,7 @@ class TestFavoriteDefense:
 
         # 注册用户 B
         with UserClient() as uc:
-            email = f"cross-list-{uuid.uuid4().hex[:8]}@e2e.example"
+            email = generate_unique_email("cross-list")
             uc.register({
                 "first_name": "CrossList", "last_name": "User",
                 "email": email, "password": "Str0ng!Pass",

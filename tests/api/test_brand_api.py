@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import uuid
+from src.common.data_factory import generate_unique_slug
 
 import pytest
 
@@ -19,7 +19,7 @@ def client() -> BrandClient:
 
 
 def _create_brand(client: BrandClient, name: str = "E2E Brand", slug: str | None = None) -> dict:
-    slug = slug or f"e2e-brand-{uuid.uuid4().hex[:8]}"
+    slug = slug or generate_unique_slug("e2e-brand")
     r = client.post("/brands", json={"name": name, "slug": slug})
     assert r.status_code == 201, f"prep create failed: {r.status_code} {r.text}"
     return r.json()
@@ -56,7 +56,7 @@ class TestGetBrands:
 class TestCreateBrand:
     # [API_BRAND_003]
     def test_create_201(self, client: BrandClient) -> None:
-        slug = f"test-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("test")
         r = client.post("/brands", json={"name": "New Brand", "slug": slug})
         assert r.status_code == 201, f"期望201, 实际{r.status_code}"
         d = r.json()
@@ -74,7 +74,7 @@ class TestCreateBrand:
 
     # [API_BRAND_006]
     def test_duplicate_slug_409(self, client: BrandClient) -> None:
-        slug = f"dup-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("dup")
         _create_brand(client, slug=slug)
         r = client.post("/brands", json={"name": "Dup Brand", "slug": slug})
         assert r.status_code == 409, f"期望409, 实际{r.status_code}"
@@ -225,7 +225,7 @@ class TestBrandBoundary:
 
     # [API_BRAND_024]
     def test_name_empty_string_422(self, client: BrandClient) -> None:
-        r = client.post("/brands", json={"name": "", "slug": f"empty-name-{uuid.uuid4().hex[:8]}"})
+        r = client.post("/brands", json={"name": "", "slug": generate_unique_slug("empty-name")})
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_BRAND_025]
@@ -241,8 +241,8 @@ class TestBrandBoundary:
 class TestBrandAuth:
     # [API_BRAND_026]
     def test_put_slug_conflict_409(self, client: BrandClient) -> None:
-        slug_a = f"conflict-a-{uuid.uuid4().hex[:8]}"
-        slug_b = f"conflict-b-{uuid.uuid4().hex[:8]}"
+        slug_a = generate_unique_slug("conflict-a")
+        slug_b = generate_unique_slug("conflict-b")
         _create_brand(client, name="Brand A", slug=slug_a)
         b = _create_brand(client, name="Brand B", slug=slug_b)
         r = client.put(f"/brands/{b['id']}", json={"name": "Brand A", "slug": slug_a})
@@ -267,7 +267,7 @@ class TestBrandAuthGaps:
     # [API_BRAND_029] P1
     def test_post_unauthenticated_401(self) -> None:
         bc = BrandClient()
-        slug = f"unauth-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("unauth")
         r = bc.post("/brands", json={"name": "X", "slug": slug})
         assert r.status_code in (200, 201, 401), f"意外: {r.status_code}（公开环境可能无需认证）"
 
@@ -288,7 +288,7 @@ class TestBrandBoundaryGaps:
 
     # [API_BRAND_031] P2
     def test_name_overlong_422(self, client: BrandClient) -> None:
-        slug = f"bndry-{uuid.uuid4().hex[:8]}"
+        slug = generate_unique_slug("bndry")
         r = client.post("/brands", json={"name": "A" * 256, "slug": slug})
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 

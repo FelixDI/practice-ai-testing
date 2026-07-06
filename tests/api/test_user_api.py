@@ -6,13 +6,13 @@
 from __future__ import annotations
 
 import copy
-import uuid
 from datetime import date, timedelta
 from typing import Any
 
 import pytest
 
 from src.api.client.user_client import UserClient
+from src.common.data_factory import unique_id
 from tests.conftest import generate_unique_email
 
 
@@ -116,7 +116,7 @@ class TestRegister:
 
     # [API_USER_010]
     def test_invalid_email_format(self, user_client: UserClient) -> None:
-        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = f"bad-email-{uuid.uuid4().hex[:6]}"
+        d = copy.deepcopy(VALID_PAYLOAD); d["email"] = f"bad-email-{unique_id(6)}"
         r = user_client.post("/users/register", json=d)
         assert r.status_code in (201, 422, 409), f"意外: {r.status_code}"
 
@@ -148,7 +148,7 @@ class TestRegister:
 
     # [API_USER_015]
     def test_email_too_long(self, user_client: UserClient) -> None:
-        long_email = f"{'a' * 248}@{uuid.uuid4().hex[:6]}.x"
+        long_email = f"{'a' * 248}@{unique_id(6)}.x"
         d = copy.deepcopy(VALID_PAYLOAD); d["email"] = long_email; d["password"] = "Str0ng!Pass"
         r = user_client.post("/users/register", json=d)
         assert r.status_code in (201, 422), f"意外: {r.status_code}（API 可能不校验 email 长度）"
@@ -228,7 +228,7 @@ class TestLogin:
 
     # [API_USER_020]
     def test_nonexistent_email_401(self, user_client: UserClient) -> None:
-        r = user_client.post("/users/login", json={"email": f"no-{uuid.uuid4().hex[:8]}@x.com", "password": "Anything1!"})
+        r = user_client.post("/users/login", json={"email": generate_unique_email("no", domain="x.com"), "password": "Anything1!"})
         assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
     # [API_USER_021]

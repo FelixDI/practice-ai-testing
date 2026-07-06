@@ -5,34 +5,19 @@
 
 from __future__ import annotations
 
-import secrets
-import string
-import uuid
 
 import pytest
 from playwright.sync_api import Page, expect
 
+from src.common.data_factory import generate_unique_email, generate_valid_password
 from src.ui.pages.register_page import RegisterPage
 from src.common.config import TEST_USER_EMAIL, TEST_USER_PASSWORD
-
-
-def _gen_password(length: int = 16) -> str:
-    """生成符合 Toolshop 密码策略的随机密码。"""
-    chars = string.ascii_letters + string.digits
-    base = list(secrets.choice(chars) for _ in range(length - 1))
-    # 确保至少一个特殊字符
-    special = secrets.choice("!@#$%^&*")
-    pos = secrets.randbelow(len(base))
-    base.insert(pos, special)
-    return "".join(base)
-
 
 def _fill_valid_form(page: RegisterPage, email: str, password: str) -> None:
     """填写完整合法的注册表单。"""
     page.fill_basic_info("Test", "User", "1990-01-15")
     page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
     page.fill_contact("5551234567", email, password)
-
 
 @pytest.fixture
 def register_page(page: Page) -> RegisterPage:
@@ -41,21 +26,18 @@ def register_page(page: Page) -> RegisterPage:
     expect(rp.register_form).to_be_visible(timeout=30000)
     return rp
 
-
 class TestRegisterSuccess:
     """P0 正常注册。"""
 
     # [UI_REG_001] P0
     def test_register_success_redirects_to_login(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         _fill_valid_form(
             register_page,
-            email=f"test-{uniq}@example.com",
-            password=_gen_password(),
+            email=generate_unique_email("test", domain="example.com"),
+            password=generate_valid_password(),
         )
         register_page.submit()
         expect(register_page._page).to_have_url("/auth/login", timeout=15000)
-
 
 class TestRegisterValidation:
     """P0 + P1 表单校验。"""
@@ -72,7 +54,7 @@ class TestRegisterValidation:
         _fill_valid_form(
             register_page,
             email=TEST_USER_EMAIL,
-            password=_gen_password(),
+            password=generate_valid_password(),
         )
         register_page.submit()
         expect(register_page.register_error).to_be_visible(timeout=10000)
@@ -80,10 +62,9 @@ class TestRegisterValidation:
 
     # [UI_REG_004] P1
     def test_weak_password_only_numbers(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         _fill_valid_form(
             register_page,
-            email=f"test-{uniq}@example.com",
+            email=generate_unique_email("test", domain="example.com"),
             password="12345678",
         )
         register_page.submit()
@@ -91,10 +72,9 @@ class TestRegisterValidation:
 
     # [UI_REG_005] P1
     def test_password_no_special_char(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         _fill_valid_form(
             register_page,
-            email=f"test-{uniq}@example.com",
+            email=generate_unique_email("test", domain="example.com"),
             password="NoSpecialChar1",
         )
         register_page.submit()
@@ -104,49 +84,44 @@ class TestRegisterValidation:
     def test_invalid_email_format(self, register_page: RegisterPage) -> None:
         register_page.fill_basic_info("Test", "User", "1990-01-15")
         register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
-        register_page.fill_contact("5551234567", "not-an-email", _gen_password())
+        register_page.fill_contact("5551234567", "not-an-email", generate_valid_password())
         register_page.submit()
         expect(register_page.field_error("email")).to_be_visible(timeout=5000)
 
     # [UI_REG_011] P1
     def test_phone_with_letters_shows_error(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         register_page.fill_basic_info("Test", "User", "1990-01-15")
         register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
-        register_page.fill_contact("abc", f"test-{uniq}@example.com", _gen_password())
+        register_page.fill_contact("abc", generate_unique_email("test", domain="example.com"), generate_valid_password())
         register_page.submit()
         expect(register_page.field_error("phone")).to_be_visible(timeout=5000)
         expect(register_page.field_error("phone")).to_contain_text("Only numbers are allowed")
 
     # [UI_REG_012] P1
     def test_password_too_short(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         register_page.fill_basic_info("Test", "User", "1990-01-15")
         register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
-        register_page.fill_contact("5551234567", f"test-{uniq}@example.com", "Ab1!")
+        register_page.fill_contact("5551234567", generate_unique_email("test", domain="example.com"), "Ab1!")
         register_page.submit()
         expect(register_page.field_error("password")).to_be_visible(timeout=5000)
         expect(register_page.field_error("password")).to_contain_text("minimal 6 characters")
-
 
 class TestRegisterBoundary:
     """P2 边界条件。"""
 
     # [UI_REG_007] P2
     def test_dob_invalid_format(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         register_page.fill_basic_info("Test", "User", "abc")
         register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
-        register_page.fill_contact("5551234567", f"test-{uniq}@example.com", _gen_password())
+        register_page.fill_contact("5551234567", generate_unique_email("test", domain="example.com"), generate_valid_password())
         register_page.submit()
         expect(register_page.field_error("dob")).to_be_visible(timeout=5000)
 
     # [UI_REG_008] P2
     def test_dob_future_date(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         register_page.fill_basic_info("Test", "User", "2099-01-01")
         register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
-        register_page.fill_contact("5551234567", f"test-{uniq}@example.com", _gen_password())
+        register_page.fill_contact("5551234567", generate_unique_email("test", domain="example.com"), generate_valid_password())
         register_page.submit()
         # 应被前端或服务端拒绝
         error = register_page.field_error("dob")
@@ -155,10 +130,9 @@ class TestRegisterBoundary:
 
     # [UI_REG_009] P2
     def test_overlong_first_name(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         register_page.fill_basic_info("A" * 200, "User", "1990-01-15")
         register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
-        register_page.fill_contact("5551234567", f"test-{uniq}@example.com", _gen_password())
+        register_page.fill_contact("5551234567", generate_unique_email("test", domain="example.com"), generate_valid_password())
         register_page.submit()
         # 页面不崩溃；可能通过前端校验或被服务端拒绝
         expect(register_page.register_form).to_be_visible()
@@ -171,7 +145,6 @@ class TestRegisterBoundary:
         expect(register_page.password_input).to_have_attribute("type", "text")
         register_page.password_toggle.click()
         expect(register_page.password_input).to_have_attribute("type", "password")
-
 
 class TestLoggedInState:
     """P3 已登录状态。"""
@@ -198,10 +171,9 @@ class TestRegisterSecurity:
 
     # [UI_REG_014] P3
     def test_xss_injection_in_name(self, register_page: RegisterPage) -> None:
-        uniq = uuid.uuid4().hex[:8]
         register_page.fill_basic_info("<script>alert(1)</script>", "User", "1990-01-15")
         register_page.fill_address("US", "90210", "123", "Main Street", "Beverly Hills", "California")
-        register_page.fill_contact("5551234567", f"test-{uniq}@example.com", _gen_password())
+        register_page.fill_contact("5551234567", generate_unique_email("test", domain="example.com"), generate_valid_password())
         register_page.submit()
         # 页面不崩溃、不弹窗
         expect(register_page.register_form).to_be_visible()
