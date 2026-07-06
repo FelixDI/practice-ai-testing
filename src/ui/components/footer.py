@@ -20,7 +20,7 @@ class Footer:
     @property
     def container(self) -> Locator:
         """页脚段落（无 data-test，通过文本特征定位）。"""
-        return self._page.locator("p:has-text('DEMO application')")
+        return self._page.locator("footer:has-text('DEMO application')")
 
     # -- 链接（文本定位，无 data-test）--------------------------------------
 
