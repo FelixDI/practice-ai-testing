@@ -85,7 +85,7 @@ pipeline {
             steps {
                 script {
                     // 安装 Chromium（检测和测试都需要）
-                    sh 'uv run playwright install chromium'
+                    sh 'uv run playwright install --with-deps chromium'
 
                     // Playwright 实测：导航 + 等待 nav-home 渲染
                     def blocked = sh(
