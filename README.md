@@ -39,7 +39,7 @@ AI Engineering Stack
 │       杜绝"写完就忘、攒 10 个文件一起炸"的 AI 协作顽疾
 │
 ├── Skills 编排
-│   └── Python 自动化测试编码规范 Skill（全局复用）+ audit-module 审计 Skill
+│   └── python-automation-test-standard Skill（全局复用）+ loop / code-review / verify 等内置 Skill
 │
 └── CI/CD 双流水线
     ├── GitHub Actions：Git Push → API ∥ UI → Allure HTML → GitHub Pages
@@ -75,7 +75,9 @@ src-layout 工程结构 + uv 依赖管理（pyproject.toml + uv.lock）
 **CI/CD 双流水线**
 
 - `uv` 统一本地/CI 依赖管理（`uv.lock` 锁定 + `astral-sh/setup-uv@v7` 缓存），`uv run pytest` 替代硬编码 venv 路径，跨平台一套命令
-- UI 测试前置 `check_site_reachability.py`（Playwright 实测渲染，非 curl）自动跳过 Cloudflare 拦截
+- **测试前置检查**：
+  - UI：`check_site_reachability.py`（Playwright 实测渲染，非 curl）自动跳过 Cloudflare 拦截
+  - 账号：`pytest_configure` 启动时验证托管账号可用性，靶场数据重建后自动重新注册，避免大面积 401 skip
 - **Jenkins 专项优化**：`Skip Docs-Only` 阶段 / `archiveArtifacts` 归档 Playwright trace / gh-pages 推送含 3 次重试
 - 多环境账号隔离（本地 / Jenkins / GitHub Actions 各用独立账号，凭据统一在 `config.py` 维护，CI 动态注入）
 
