@@ -51,12 +51,18 @@ def generate_unique_email(
 ) -> str:
     """Generate a unique but realistic test email address.
 
+    Combines Faker (deterministic, unique within session) with a uuid suffix
+    for cross-run uniqueness — prevents 409 when CI re-runs with the same seed.
+
     Args:
         prefix: Fixed leading segment (e.g. ``"reg"``, ``"totp"``).
         domain: Domain part; override for alternative providers.
     """
-    token = _fake.unique.lexify(text="?" * 8).lower()
-    return f"{prefix}-{token}@{domain}"
+    import uuid
+
+    token = _fake.unique.lexify(text="?" * 6).lower()
+    suffix = uuid.uuid4().hex[:4]
+    return f"{prefix}-{token}-{suffix}@{domain}"
 
 
 def generate_unique_slug(prefix: str = "e2e") -> str:
