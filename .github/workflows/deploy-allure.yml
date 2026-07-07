@@ -1,5 +1,7 @@
 name: Deploy Allure Report
 
+# Frozen: triggers only when Tests workflow completes (now manual-only via workflow_dispatch)
+
 on:
   workflow_run:
     workflows:
