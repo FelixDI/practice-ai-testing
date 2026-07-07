@@ -49,7 +49,8 @@ def _mod_auth() -> Generator[dict[str, Any]]:
         "dob": "1990-01-01",
     })
     assert r.status_code == 201, f"module 注册失败: {r.status_code} {r.text}"
-    uc.login(email, "Str0ng!Pass")
+    result = uc.login(email, "Str0ng!Pass")
+    assert "access_token" in result, f"module login failed: {result}"
     yield {"client": uc, "email": email, "password": "Str0ng!Pass", "user_id": r.json()["id"]}
     uc.logout()
     uc.close()
@@ -204,7 +205,8 @@ class TestCreateInvoice:
     def ctx(self, _mod_auth: dict[str, Any]) -> dict[str, Any]:
         """登录用户 + 独立 cart（创建类测试需要独立 cart，避免冲突）"""
         uc: UserClient = _mod_auth["client"]
-        uc.login(_mod_auth["email"], _mod_auth["password"])  # refresh token
+        result = uc.login(_mod_auth["email"], _mod_auth["password"])  # refresh token
+        assert "access_token" in result, f"create-invoice login failed: {result}"
         cart_id, _ = _setup_cart_with_item(uc)
         return {"client": uc, "cart_id": cart_id, "email": _mod_auth["email"]}
 
@@ -537,7 +539,8 @@ class TestInvoiceBoundary:
     def ctx(self, _mod_auth: dict[str, Any]) -> dict[str, Any]:
         uc: UserClient = _mod_auth["client"]
         # module 级 token 可能在长测试套件中过期，重新登录刷新
-        uc.login(_mod_auth["email"], _mod_auth["password"])
+        result = uc.login(_mod_auth["email"], _mod_auth["password"])
+        assert "access_token" in result, f"boundary login failed: {result}"
         cart_id, _ = _setup_cart_with_item(uc)
         return {"client": uc, "cart_id": cart_id}
 
@@ -658,21 +661,23 @@ class TestInvoiceDefense:
 
     # [API_INVOICE_061] P3
     def test_xss_billing_street(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
-        uc.login(_mod_auth["email"], _mod_auth["password"])
-        cart_id, _ = _setup_cart_with_item(uc)
-        # 尝试多个地址（地址校验可能失败）
-        for addr in [BILLING] + BILLING_FALLBACKS:
-            r = uc.post("/invoices", json={
-                **addr,
-                "billing_street": "<script>alert(1)</script>",
-                "payment_method": "cash-on-delivery",
-                "payment_details": {},
-                "cart_id": cart_id,
-            })
-            if r.status_code in (200, 201, 422):
-                break
-        assert r.status_code in (200, 201, 422), f"期望200/201/422（应转义）, 实际{r.status_code} {r.text}"
+        # 使用独立 UserClient，避免共享 session 被长测试套件耗尽
+        with UserClient() as uc:
+            result = uc.login(_mod_auth["email"], _mod_auth["password"])
+            assert "access_token" in result, f"xss login failed: {result}"
+            cart_id, _ = _setup_cart_with_item(uc)
+            # 尝试多个地址（地址校验可能失败）
+            for addr in [BILLING] + BILLING_FALLBACKS:
+                r = uc.post("/invoices", json={
+                    **addr,
+                    "billing_street": "<script>alert(1)</script>",
+                    "payment_method": "cash-on-delivery",
+                    "payment_details": {},
+                    "cart_id": cart_id,
+                })
+                if r.status_code in (200, 201, 422):
+                    break
+            assert r.status_code in (200, 201, 422), f"期望200/201/422（应转义）, 实际{r.status_code} {r.text}"
 
     # [API_INVOICE_062] P3
     def test_token_expired_create(self, _mod_auth: dict[str, Any]) -> None:

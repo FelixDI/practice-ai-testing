@@ -62,14 +62,18 @@ def generate_unique_email(
 def generate_unique_slug(prefix: str = "e2e") -> str:
     """Generate a unique URL slug for entity creation (Brand, Category, …).
 
-    Uses a real dictionary word so slugs read naturally:
-    ``e2e-cat-forest`` instead of ``e2e-cat-a1b2c3d4``.
+    Uses a real dictionary word so slugs read naturally, plus a short random
+    suffix for cross-run uniqueness (prevents 409 when CI re-runs with same seed):
+    ``e2e-cat-forest-x7k2`` instead of ``e2e-cat-a1b2c3d4``.
 
     Args:
         prefix: Leading segment, e.g. ``"e2e-cat"``, ``"e2e-brand"``.
     """
+    import uuid
+
     word = _fake.unique.word().lower().replace(" ", "-")[:12]
-    return f"{prefix}-{word}"
+    suffix = uuid.uuid4().hex[:4]
+    return f"{prefix}-{word}-{suffix}"
 
 
 def generate_unique_product_name(prefix: str = "E2E Product") -> str:

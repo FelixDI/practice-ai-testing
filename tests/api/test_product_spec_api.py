@@ -9,7 +9,7 @@ import pytest
 
 from src.api.client.product_spec_client import ProductSpecClient
 from src.api.client.user_client import UserClient
-from src.common.config import TEST_USER_EMAIL, TEST_USER_PASSWORD
+from src.common.data_factory import generate_unique_email
 
 
 # -- module 级夹具 --------------------------------------------------------
@@ -26,13 +26,29 @@ def _mod_product_id() -> str:
 
 
 @pytest.fixture(scope="module")
-def _mod_auth_spec() -> ProductSpecClient:
-    """module 级：已认证的 ProductSpecClient。"""
-    with UserClient() as uc:
-        uc.login(TEST_USER_EMAIL, TEST_USER_PASSWORD)
-        token = uc.token
+def _mod_spec_user() -> dict[str, str]:
+    """module 级：注册独立账号，不共享 TEST_USER_EMAIL（避免多模块 login/logout 挤占）。"""
+    uc = UserClient()
+    email = generate_unique_email("specmod")
+    password = "SpecMod1!"
+    r = uc.post("/users/register", json={
+        "first_name": "SpecMod", "last_name": "User",
+        "email": email, "password": password,
+        "address": {"street": "S", "city": "Berlin", "country": "DE", "postal_code": "12345"},
+        "dob": "1990-01-01",
+    })
+    assert r.status_code == 201, f"spec module 注册失败: {r.status_code} {r.text}"
+    uc.login(email, password)
+    yield {"client": uc, "email": email, "password": password, "token": uc.token}
+    uc.logout()
+    uc.close()
+
+
+@pytest.fixture(scope="module")
+def _mod_auth_spec(_mod_spec_user: dict[str, str]) -> ProductSpecClient:
+    """module 级：已认证的 ProductSpecClient（独立账号，不抢 TEST_USER_EMAIL）。"""
     with ProductSpecClient() as psc:
-        psc.set_token(token)
+        psc.set_token(_mod_spec_user["token"])
         yield psc
 
 
@@ -55,13 +71,10 @@ def client() -> ProductSpecClient:
 
 
 @pytest.fixture
-def _auth_spec() -> ProductSpecClient:
-    """function 级：已认证的 ProductSpecClient（mutation 测试用）。"""
-    with UserClient() as uc:
-        uc.login(TEST_USER_EMAIL, TEST_USER_PASSWORD)
-        token = uc.token
+def _auth_spec(_mod_spec_user: dict[str, str]) -> ProductSpecClient:
+    """function 级：已认证的 ProductSpecClient（复用 module 级独立账号 token，不重复登录）。"""
     with ProductSpecClient() as psc:
-        psc.set_token(token)
+        psc.set_token(_mod_spec_user["token"])
         yield psc
 
 

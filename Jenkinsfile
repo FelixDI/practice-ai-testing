@@ -85,7 +85,7 @@ pipeline {
             steps {
                 script {
                     // 安装 Chromium（检测和测试都需要）
-                    sh 'uv run playwright install --with-deps chromium'
+                    sh 'uv run playwright install chromium'
 
                     // Playwright 实测：导航 + 等待 nav-home 渲染
                     def blocked = sh(
@@ -114,7 +114,7 @@ pipeline {
             }
             post {
                 always {
-                    junit 'junit-ui.xml'
+                    junit allowEmptyResults: true, testResults: 'junit-ui.xml'
                     archiveArtifacts(
                         artifacts: 'test-results/**, allure-results-ui/**, junit-ui.xml',
                         allowEmptyArchive: true,
