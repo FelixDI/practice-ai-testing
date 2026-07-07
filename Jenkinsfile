@@ -178,7 +178,7 @@ pipeline {
                                 <title>Allure Reports</title>
                                 <p>Redirecting to <a href="api-allure-report/">API Allure Report</a>…</p>
                                 <p><a href="ui-allure-report/">UI Allure Report</a></p>
-                                HTMLEOF
+HTMLEOF
                                 git init
                                 git config user.name  "Jenkins CI"
                                 git config user.email "jenkins@ci.local"
