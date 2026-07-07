@@ -52,14 +52,9 @@ def client() -> ContactClient:
 
 
 @pytest.fixture
-def _auth_contact() -> ContactClient:
-    """function 级：已认证的 ContactClient。"""
-    with UserClient() as uc:
-        uc.login(TEST_USER_EMAIL, TEST_USER_PASSWORD)
-        token = uc.token
-    with ContactClient() as cc:
-        cc.set_token(token)
-        yield cc
+def _auth_contact(_mod_auth_contact: ContactClient) -> ContactClient:
+    """function 级：复用 module 级 token，避免高频 login 触发限流。"""
+    return _mod_auth_contact
 
 
 def _send_message(client: ContactClient) -> str:

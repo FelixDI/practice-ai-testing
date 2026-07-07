@@ -90,14 +90,16 @@ def _mod_auth_fav(_mod_product_ids: list[str]) -> tuple[FavoriteClient, str, str
 # -- function 级夹具（mutation 隔离）---------------------------------------
 
 @pytest.fixture
-def _auth_fav(_mod_product_ids: list[str]) -> FavoriteClient:
-    """function 级：独立的已认证 FavoriteClient。
+def _auth_fav(
+    _mod_product_ids: list[str], _mod_auth_fav: tuple[FavoriteClient, str, str]
+) -> FavoriteClient:
+    """function 级：独立的 FavoriteClient（复用 module 级 token，避免高频 login 限流）。
 
     不预创建收藏——各测试通过 _get_unfavorited_product() 自行获取未收藏的商品。
     """
-    token = _login_and_get_token()
+    module_fc, _, _ = _mod_auth_fav
     fc = FavoriteClient()
-    fc.set_token(token)
+    fc.set_token(module_fc.token)
     yield fc
     fc.close()
 
