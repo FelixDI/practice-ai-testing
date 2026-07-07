@@ -33,7 +33,12 @@ _MANAGED_ACCOUNTS: list[tuple[str, str, str]] = [
 
 
 def _ensure_account(label: str, email: str, password: str) -> str:
-    """验证并修复单个测试账号。返回状态：ok / registered / error。"""
+    """验证并修复单个测试账号。返回状态：ok / registered / error。
+
+    注册失败（500/超时）自动重试 2 次——靶场 API 偶尔不稳定。
+    """
+    import time
+
     r = requests.post(
         f"{API_BASE_URL}/users/login",
         json={"email": email, "password": password},
@@ -42,26 +47,33 @@ def _ensure_account(label: str, email: str, password: str) -> str:
     if r.status_code == 200:
         return "ok"
 
-    # 401 → 账号不存在或被删，重新注册
-    rr = requests.post(
-        f"{API_BASE_URL}/users/register",
-        json={
-            "first_name": "Test",
-            "last_name": label.capitalize(),
-            "email": email,
-            "password": password,
-            "address": {
-                "street": "Teststr.",
-                "city": "Berlin",
-                "country": "DE",
-                "postal_code": "10115",
+    # 401 → 账号不存在或被删，重新注册（500/超时自动重试）
+    for attempt in range(3):
+        rr = requests.post(
+            f"{API_BASE_URL}/users/register",
+            json={
+                "first_name": "Test",
+                "last_name": label.capitalize(),
+                "email": email,
+                "password": password,
+                "address": {
+                    "street": "Teststr.",
+                    "city": "Berlin",
+                    "country": "DE",
+                    "postal_code": "10115",
+                },
+                "dob": "1990-01-01",
             },
-            "dob": "1990-01-01",
-        },
-        timeout=15,
-    )
-    if rr.status_code in (200, 201):
-        return "registered"
+            timeout=15,
+        )
+        if rr.status_code in (200, 201):
+            return "registered"
+        if rr.status_code >= 500:
+            if attempt < 2:
+                time.sleep(2)
+                continue
+        else:
+            break  # 4xx 不重试
     return f"error({rr.status_code})"
 
 
