@@ -339,6 +339,16 @@ class TestGuestInvoice:
 # 1.4 订单详情（3 条）── API_INVOICE_018 ~ 020
 # ======================================================================
 
+
+@pytest.fixture(scope="module")
+def _mod_auth_fresh(_mod_auth: dict[str, Any]) -> Generator[dict[str, Any]]:
+    """module 级：独立 session 的已认证客户端（避免共享 session token 过期）。"""
+    with UserClient() as uc:
+        result = uc.login(_mod_auth["email"], _mod_auth["password"])
+        assert "access_token" in result, f"fresh login failed: {result}"
+        yield {"client": uc, "email": _mod_auth["email"]}
+
+
 class TestGetInvoice:
     # fixture 移到模块级 _mod_invoice
 
@@ -352,8 +362,8 @@ class TestGetInvoice:
         assert "invoice_number" in d and "total" in d and "invoicelines" in d
 
     # [API_INVOICE_019]
-    def test_get_nonexistent_404(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
+    def test_get_nonexistent_404(self, _mod_auth_fresh: dict[str, Any]) -> None:
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.get("/invoices/nonexistent-99999")
         assert r.status_code == 404, f"期望404, 实际{r.status_code}"
 
@@ -378,8 +388,8 @@ class TestPutInvoice:
         assert r.status_code in (200, 422), f"意外: {r.status_code} {r.text}"
 
     # [API_INVOICE_022]
-    def test_put_nonexistent(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
+    def test_put_nonexistent(self, _mod_auth_fresh: dict[str, Any]) -> None:
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.put("/invoices/nonexistent-99999", json={
             **BILLING, "payment_method": "bank-transfer", "payment_details": BANK_DETAILS, "cart_id": "x",
         })
@@ -399,13 +409,13 @@ class TestPatchInvoice:
 
     # [API_INVOICE_024]
     def test_patch_success(self, _mod_auth: dict[str, Any], _mod_invoice: dict[str, Any] | None) -> None:
-        uc: UserClient = _mod_auth["client"]
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.patch(f"/invoices/{_mod_invoice['invoice_id']}", json={"billing_city": "NewCity"})
         assert r.status_code in (200, 422), f"意外: {r.status_code} {r.text}"
 
     # [API_INVOICE_025]
-    def test_patch_nonexistent(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
+    def test_patch_nonexistent(self, _mod_auth_fresh: dict[str, Any]) -> None:
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.patch("/invoices/nonexistent-99999", json={"billing_city": "X"})
         assert r.status_code in (404, 500), f"意外: {r.status_code}"
 
@@ -423,19 +433,19 @@ class TestUpdateStatus:
 
     # [API_INVOICE_027]
     def test_status_shipped(self, _mod_auth: dict[str, Any], _mod_invoice: dict[str, Any] | None) -> None:
-        uc: UserClient = _mod_auth["client"]
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.put(f"/invoices/{_mod_invoice['invoice_id']}/status", json={"status": "SHIPPED"})
         assert r.status_code in (200, 422), f"意外: {r.status_code} {r.text}"
 
     # [API_INVOICE_028]
     def test_status_invalid_422(self, _mod_auth: dict[str, Any], _mod_invoice: dict[str, Any] | None) -> None:
-        uc: UserClient = _mod_auth["client"]
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.put(f"/invoices/{_mod_invoice['invoice_id']}/status", json={"status": "CANCELLED"})
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_INVOICE_029]
-    def test_status_nonexistent(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
+    def test_status_nonexistent(self, _mod_auth_fresh: dict[str, Any]) -> None:
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.put("/invoices/nonexistent-99999/status", json={"status": "SHIPPED"})
         assert r.status_code in (404, 500), f"意外: {r.status_code}"
 
@@ -446,13 +456,13 @@ class TestUpdateStatus:
 
     # [API_INVOICE_031]
     def test_status_message_too_long(self, _mod_auth: dict[str, Any], _mod_invoice: dict[str, Any] | None) -> None:
-        uc: UserClient = _mod_auth["client"]
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.put(f"/invoices/{_mod_invoice['invoice_id']}/status", json={"status": "SHIPPED", "status_message": "A" * 51})
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
     # [API_INVOICE_032]
     def test_status_message_too_short(self, _mod_auth: dict[str, Any], _mod_invoice: dict[str, Any] | None) -> None:
-        uc: UserClient = _mod_auth["client"]
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.put(f"/invoices/{_mod_invoice['invoice_id']}/status", json={"status": "SHIPPED", "status_message": "OK"})
         assert r.status_code == 422, f"期望422, 实际{r.status_code}"
 
@@ -465,13 +475,13 @@ class TestPdf:
 
     # [API_INVOICE_033]
     def test_download_pdf(self, _mod_auth: dict[str, Any], _mod_invoice: dict[str, Any] | None) -> None:
-        uc: UserClient = _mod_auth["client"]
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.get(f"/invoices/{_mod_invoice['invoice_number']}/download-pdf")
         assert r.status_code in (200, 500), f"意外: {r.status_code}"
 
     # [API_INVOICE_034]
-    def test_download_nonexistent(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
+    def test_download_nonexistent(self, _mod_auth_fresh: dict[str, Any]) -> None:
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.get("/invoices/INV-00000000/download-pdf")
         assert r.status_code in (404, 500), f"意外: {r.status_code}"
 
@@ -482,13 +492,13 @@ class TestPdf:
 
     # [API_INVOICE_036]
     def test_pdf_status(self, _mod_auth: dict[str, Any], _mod_invoice: dict[str, Any] | None) -> None:
-        uc: UserClient = _mod_auth["client"]
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.get(f"/invoices/{_mod_invoice['invoice_number']}/download-pdf-status")
         assert r.status_code in (200, 500), f"意外: {r.status_code}"
 
     # [API_INVOICE_037]
-    def test_pdf_status_nonexistent(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
+    def test_pdf_status_nonexistent(self, _mod_auth_fresh: dict[str, Any]) -> None:
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.get("/invoices/INV-00000000/download-pdf-status")
         assert r.status_code in (400, 404, 500), f"意外: {r.status_code}"
 
@@ -506,13 +516,13 @@ class TestSearchInvoices:
 
     # [API_INVOICE_039]
     def test_search(self, _mod_auth: dict[str, Any], _mod_invoice: dict[str, Any] | None) -> None:
-        uc: UserClient = _mod_auth["client"]
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.get("/invoices/search", params={"q": _mod_invoice["invoice_number"]})
         assert r.status_code in (200, 500), f"意外: {r.status_code}"
 
     # [API_INVOICE_040]
-    def test_search_no_match(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
+    def test_search_no_match(self, _mod_auth_fresh: dict[str, Any]) -> None:
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.get("/invoices/search", params={"q": "xyznonexistent999"})
         assert r.status_code in (200, 500), f"意外: {r.status_code}"
 
@@ -522,8 +532,8 @@ class TestSearchInvoices:
         assert r.status_code == 401, f"期望401, 实际{r.status_code}"
 
     # [API_INVOICE_042]
-    def test_search_no_q(self, _mod_auth: dict[str, Any]) -> None:
-        uc: UserClient = _mod_auth["client"]
+    def test_search_no_q(self, _mod_auth_fresh: dict[str, Any]) -> None:
+        uc: UserClient = _mod_auth_fresh["client"]
         r = uc.get("/invoices/search")
         assert r.status_code in (200, 400), f"意外: {r.status_code}"
 
@@ -678,11 +688,10 @@ class TestInvoiceDefense:
     """P3 深度防御补充。"""
 
     # [API_INVOICE_061] P3
-    def test_xss_billing_street(self, _mod_auth: dict[str, Any]) -> None:
-        # 使用独立 UserClient，避免共享 session 被长测试套件耗尽
+    def test_xss_billing_street(self, _mod_boundary_user: dict[str, str]) -> None:
+        # 使用独立账号 _mod_boundary_user，避免 _mod_auth 被高频登录限流
         with UserClient() as uc:
-            result = uc.login(_mod_auth["email"], _mod_auth["password"])
-            assert "access_token" in result, f"xss login failed: {result}"
+            uc.set_token(_mod_boundary_user["token"])
             cart_id, _ = _setup_cart_with_item(uc)
             # 尝试多个地址（地址校验可能失败）
             for addr in [BILLING] + BILLING_FALLBACKS:
