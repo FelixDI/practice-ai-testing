@@ -80,6 +80,18 @@ jobs:
               --clean
           fi
 
+      - name: Create root redirect page
+        run: |
+          mkdir -p _site
+          cat > _site/index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=api-allure-report/">
+          <title>Allure Reports</title>
+          <p>Redirecting to <a href="api-allure-report/">API Allure Report</a>…</p>
+          <p><a href="ui-allure-report/">UI Allure Report</a></p>
+          HTMLEOF
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:

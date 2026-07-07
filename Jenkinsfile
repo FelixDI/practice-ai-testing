@@ -171,6 +171,14 @@ pipeline {
                             attempts++
                             sh '''
                                 cd _site
+                                cat > index.html << 'HTMLEOF'
+                                <!DOCTYPE html>
+                                <meta charset="utf-8">
+                                <meta http-equiv="refresh" content="0; url=api-allure-report/">
+                                <title>Allure Reports</title>
+                                <p>Redirecting to <a href="api-allure-report/">API Allure Report</a>…</p>
+                                <p><a href="ui-allure-report/">UI Allure Report</a></p>
+                                HTMLEOF
                                 git init
                                 git config user.name  "Jenkins CI"
                                 git config user.email "jenkins@ci.local"
