@@ -136,10 +136,10 @@ practice-ai-testing/
 │   │   │   ├── report.md
 │   │   │   ├── totp.md
 │   │   │   └── user.md
-│   │   ├── integration/
 │   │   └── ui/
 │   │       ├── account_dashboard.md
 │   │       ├── category_page.md
+│   │       ├── checkout_page.md
 │   │       ├── contact_page.md
 │   │       ├── favorites_page.md
 │   │       ├── footer_component.md
@@ -194,6 +194,7 @@ practice-ai-testing/
 │   │   │   ├── account_dashboard.py
 │   │   │   ├── base_page.py
 │   │   │   ├── category_page.py
+│   │   │   ├── checkout_page.py
 │   │   │   ├── contact_page.py
 │   │   │   ├── favorites_page.py
 │   │   │   ├── forgot_password_page.py
@@ -225,13 +226,12 @@ practice-ai-testing/
 │   │   ├── test_report_api.py
 │   │   ├── test_totp_api.py
 │   │   └── test_user_api.py
-│   ├── integration/
-│   │   └── __init__.py
 │   ├── ui/
 │   │   ├── __init__.py
 │   │   ├── conftest.py
 │   │   ├── test_account_dashboard.py
 │   │   ├── test_category_page.py
+│   │   ├── test_checkout_page.py
 │   │   ├── test_contact_page.py
 │   │   ├── test_favorites_page.py
 │   │   ├── test_footer_component.py
@@ -256,7 +256,7 @@ practice-ai-testing/
 ├── update_tree.py
 └── uv.lock
 
-18 directories, 119 files
+16 directories, 121 files
 ```
 <!-- PROJECT_STRUCTURE_END -->
 
