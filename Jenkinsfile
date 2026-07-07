@@ -55,77 +55,73 @@ pipeline {
         }
 
         // ----------------------------------------------------------------
-        // 2. API 测试
+        // 2. API + UI 并行测试（避免串行耗尽服务器导致后半段超时）
         // ----------------------------------------------------------------
-        stage('API Tests') {
+        stage('Tests') {
             when { expression { env.SKIP_TESTS != 'true' } }
-            steps {
-                sh '''
-                    uv run pytest tests/api \
-                        -v \
-                        --tb=line \
-                        --alluredir=allure-results-api \
-                        --junitxml=junit-api.xml \
-                        || true
-                '''
-            }
-            post {
-                always {
-                    junit 'junit-api.xml'
-                    stash includes: 'allure-results-api/**', name: 'api-results'
-                }
-            }
-        }
-
-        // ----------------------------------------------------------------
-        // 3. UI 测试（Playwright 实测可达性，非 curl）
-        // ----------------------------------------------------------------
-        stage('UI Tests') {
-            when { expression { env.SKIP_TESTS != 'true' } }
-            steps {
-                script {
-                    // 安装 Chromium（检测和测试都需要）
-                    sh 'uv run playwright install chromium'
-
-                    // Playwright 实测：导航 + 等待 nav-home 渲染
-                    def blocked = sh(
-                        script: 'uv run python scripts/check_site_reachability.py',
-                        returnStdout: true
-                    ).trim()
-
-                    // 脚本输出最后一行为判定结果，含 "blocked=true" 或 "blocked=false"
-                    // 直接检查输出是否含 blocked=true
-                    if (blocked.contains('blocked=true')) {
-                        echo "⚠️ ${blocked}"
-                    } else {
-                        echo "✅ ${blocked}"
+            parallel {
+                // -- API ----------------------------------------------------
+                stage('API') {
+                    steps {
                         sh '''
-                            uv run pytest tests/ui \
+                            uv run pytest tests/api \
                                 -v \
                                 --tb=line \
-                                --screenshot=only-on-failure \
-                                --alluredir=allure-results-ui \
-                                --junitxml=junit-ui.xml \
+                                --alluredir=allure-results-api \
+                                --junitxml=junit-api.xml \
                                 || true
                         '''
-                        stash includes: 'allure-results-ui/**', name: 'ui-results'
+                    }
+                    post {
+                        always {
+                            junit 'junit-api.xml'
+                            stash includes: 'allure-results-api/**', name: 'api-results'
+                        }
+                    }
+                }
+
+                // -- UI -----------------------------------------------------
+                stage('UI') {
+                    steps {
+                        script {
+                            sh 'uv run playwright install chromium'
+                            def blocked = sh(
+                                script: 'uv run python scripts/check_site_reachability.py',
+                                returnStdout: true
+                            ).trim()
+                            if (blocked.contains('blocked=true')) {
+                                echo "⚠️ ${blocked}"
+                            } else {
+                                echo "✅ ${blocked}"
+                                sh '''
+                                    uv run pytest tests/ui \
+                                        -v \
+                                        --tb=line \
+                                        --screenshot=only-on-failure \
+                                        --alluredir=allure-results-ui \
+                                        --junitxml=junit-ui.xml \
+                                        || true
+                                '''
+                                stash includes: 'allure-results-ui/**', name: 'ui-results'
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            junit allowEmptyResults: true, testResults: 'junit-ui.xml'
+                            archiveArtifacts(
+                                artifacts: 'test-results/**, allure-results-ui/**, junit-ui.xml',
+                                allowEmptyArchive: true,
+                                fingerprint: true
+                            )
+                        }
                     }
                 }
             }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: 'junit-ui.xml'
-                    archiveArtifacts(
-                        artifacts: 'test-results/**, allure-results-ui/**, junit-ui.xml',
-                        allowEmptyArchive: true,
-                        fingerprint: true
-                    )
-                }
-            }
         }
 
         // ----------------------------------------------------------------
-        // 4. 生成 Allure 报告 → 推送到 gh-pages
+        // 3. 生成 Allure 报告 → 推送到 gh-pages
         // ----------------------------------------------------------------
         stage('Deploy Allure Report') {
             when { expression { env.SKIP_TESTS != 'true' } }
