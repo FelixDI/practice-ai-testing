@@ -203,10 +203,8 @@ class TestGetInvoices:
 class TestCreateInvoice:
     @pytest.fixture
     def ctx(self, _mod_auth: dict[str, Any]) -> dict[str, Any]:
-        """登录用户 + 独立 cart（创建类测试需要独立 cart，避免冲突）"""
+        """独立 cart（复用 module 级 token，避免高频 login 触发限流）。"""
         uc: UserClient = _mod_auth["client"]
-        result = uc.login(_mod_auth["email"], _mod_auth["password"])  # refresh token
-        assert "access_token" in result, f"create-invoice login failed: {result}"
         cart_id, _ = _setup_cart_with_item(uc)
         return {"client": uc, "cart_id": cart_id, "email": _mod_auth["email"]}
 
@@ -534,15 +532,35 @@ class TestSearchInvoices:
 # 1.11~1.12 边界+payment_details（11 条）── API_INVOICE_043~048/050~051/055~056
 # ======================================================================
 
+
+@pytest.fixture(scope="module")
+def _mod_boundary_user() -> dict[str, str]:
+    """module 级：为边界测试注册独立账号，避免与 _mod_auth 共享导致登录限流。"""
+    uc = UserClient()
+    email = generate_unique_email("invbound")
+    password = "Str0ng!Pass"
+    r = uc.post("/users/register", json={
+        "first_name": "Bound", "last_name": "User",
+        "email": email, "password": password,
+        "address": {"street": "S", "city": "Berlin", "country": "DE", "postal_code": "12345"},
+        "dob": "1990-01-01",
+    })
+    assert r.status_code == 201, f"boundary 注册失败: {r.status_code} {r.text}"
+    result = uc.login(email, password)
+    assert "access_token" in result, f"boundary module login failed: {result}"
+    yield {"client": uc, "email": email, "password": password, "token": result["access_token"]}
+    uc.logout()
+    uc.close()
+
+
 class TestInvoiceBoundary:
     @pytest.fixture
-    def ctx(self, _mod_auth: dict[str, Any]) -> dict[str, Any]:
-        uc: UserClient = _mod_auth["client"]
-        # module 级 token 可能在长测试套件中过期，重新登录刷新
-        result = uc.login(_mod_auth["email"], _mod_auth["password"])
-        assert "access_token" in result, f"boundary login failed: {result}"
-        cart_id, _ = _setup_cart_with_item(uc)
-        return {"client": uc, "cart_id": cart_id}
+    def ctx(self, _mod_boundary_user: dict[str, str]) -> dict[str, Any]:
+        """独立 cart（复用 module 级独立账号，不重复登录）。"""
+        with UserClient() as uc:
+            uc.set_token(_mod_boundary_user["token"])
+            cart_id, _ = _setup_cart_with_item(uc)
+            return {"client": uc, "cart_id": cart_id}
 
     # [API_INVOICE_043]
     def test_billing_street_too_long(self, ctx: dict[str, Any]) -> None:
