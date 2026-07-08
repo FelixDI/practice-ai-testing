@@ -28,7 +28,6 @@ scripts/             # CI/工具脚本（如 check_site_reachability.py）
 tests/
   ui/                # UI 测试
   api/               # API 测试（含 conftest.py，夹具仅供 API 层使用）
-  integration/       # 全链路集成测试
   conftest.py        # 跨测试类型共享的工具（generate_unique_email、账号健康检查、Faker seed）
 docs/
   test-cases/
