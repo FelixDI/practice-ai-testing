@@ -29,7 +29,7 @@ tests/
   ui/                # UI 测试
   api/               # API 测试（含 conftest.py，夹具仅供 API 层使用）
   integration/       # 全链路集成测试
-  conftest.py        # 跨测试类型共享的工具（仅 generate_unique_email）
+  conftest.py        # 跨测试类型共享的工具（generate_unique_email、账号健康检查、Faker seed）
 docs/
   test-cases/
     api/             # API 测试用例设计文档
@@ -738,6 +738,19 @@ def test_wrong_password_locks_account(self, destructive_user: dict) -> None:
 
 ## 通用编码规范
 
+### 数据工厂（`src/common/data_factory.py`）
+
+统一管理测试数据生成，禁止散落 `uuid` 调用：
+
+| 函数 | 用途 |
+|------|------|
+| `generate_unique_email(prefix)` | 唯一测试邮箱 ✅ `generate_unique_email("reg")` |
+| `generate_unique_slug(prefix)` | 唯一 URL slug ✅ `generate_unique_slug("e2e-brand")` |
+| `generate_unique_product_name(prefix)` | 唯一商品名称 |
+| `generate_valid_password(length)` | 合规密码（大小写+数字+特殊字符） |
+| `new_user_data(**overrides)` | 完整注册 payload，支持 `address_city` 等覆盖 |
+| `unique_id(length)` | 通用唯一标识符 |
+
 ```python
 # ✅ 文件头
 from __future__ import annotations
@@ -749,9 +762,10 @@ def test_something(self, client: BrandClient) -> None:
 # ✅ 断言含诊断信息
 assert r.status_code == 200, f"期望200, 实际{r.status_code} {r.text}"
 
-# ✅ 唯一数据用 uuid
-import uuid
-slug = f"test-{uuid.uuid4().hex[:8]}"
+# ✅ 唯一数据用 data_factory
+from src.common.data_factory import generate_unique_slug, generate_unique_email
+slug = generate_unique_slug("e2e-brand")
+email = generate_unique_email("reg")
 
 # ❌ 禁止硬编码
 url = "https://api.practicesoftwaretesting.com/brands"  # 走 config
@@ -778,8 +792,8 @@ PYTEST = str(PROJECT_ROOT / ".venv" / "bin" / "pytest")  # 跨平台炸
 | # | 坑 | 现象 | 正确做法 |
 |:--:|------|------|------|
 | 1 | **固定账号 + 可变状态 = 409** | module 夹具收藏了商品 A，function 测试也想收藏 → 409 | function 级测试用 `_get_unfavorited_product()` 先查列表 |
-| 2 | **module 夹具 token 过期** | 全量跑 12+ 分钟，后面测试 POST/PUT 全返回 401 | 在 `ctx` 夹具里加 `uc.login()` 重新登录 |
-| 3 | **硬编码 slug 跨 CI run 冲突** | 上次 CI 创建了 `slug="unauth-x"`，这次再创 → 409 | 用 `uuid.uuid4().hex[:8]` 动态生成唯一值 |
+| 2 | **module 夹具 token 过期 / 高频 login 触发限流** | 全量跑 12+ 分钟，后面测试返回 401；过多 login 同一账号被服务器拒绝 | 优先复用 module token（避免 function 级重复 login）；写操作多的模块用独立账号注册 |
+| 3 | **硬编码 slug 跨 CI run 冲突** | 上次 CI 创建了 `slug="unauth-x"`，这次再创 → 409 | 用 `generate_unique_slug()` 工厂函数（含 uuid 后缀保证跨 run 唯一） |
 | 4 | **地址校验服务不可用（永久）** | `POST /invoices` 返回 422 "city does not belong to country"，7+ 种地址变体（DE/NL/US、全称/缩写）全部失败，已验证为服务端地址校验数据库已失效 | 当前不可修复，依赖 `_mod_invoice` 的 14 条测试级联 skip，skip reason 明确标注为服务端问题；恢复后可删 fallback 逻辑 |
 | 5 | **商品 ID 数据竞争** | 添加商品到购物车返回 422 "product id is invalid" | 遍历前 5 个商品，找到一个能成功添加的 |
 | 6 | **OpenAPI 文档 ≠ 实际行为** | 文档说 400，实际 422；文档说 404，实际 204 | 以实测为准，代码里 `assert status_code in (X, Y)` 弹性断言 |

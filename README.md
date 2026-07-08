@@ -2,7 +2,7 @@
 
 > **AI 协作自动化测试工程 —— Toolshop 电商系统全栈测试**
 >
-> 以 Claude Code 为 AI 引擎，从零构建覆盖 14 个 API 模块 + 16 个 UI 页面的自动化测试体系（637 条用例，通过率 97%+），
+> 以 Claude Code 为 AI 引擎，从零构建覆盖 14 个 API 模块 + 14 个 UI 页面的自动化测试体系（646 条用例，通过率 97%+），
 > 完整跑通「需求分析 → 用例设计 → 脚本生成 → MCP 验证 → CI/CD 发布报告」的 AI 驱动闭环。
 
 ## 简历项目描述
@@ -13,7 +13,7 @@
 
 **项目概述**
 
-为 Practice Software Testing 电商平台构建全栈自动化测试框架，覆盖 API（14 模块 / 15 Client 类）与 UI（16 Page Object + 3 Component）共 **637 条用例**（通过率 97%+，19 skip 均为 Cloudflare/Angular zone.js 等不可控环境因素），打通从需求分析到 Allure 报告自动发布 GitHub Pages 的完整链路。核心目标是验证 **AI 协作开发的工程化落地**——通过规则约束、上下文管理、MCP 工具链与 CI/CD 集成，将 AI 从"辅助写代码"提升为"可控的工程生产力"。
+为 Practice Software Testing 电商平台构建全栈自动化测试框架，覆盖 API（14 模块 / 15 Client 类）与 UI（14 Page Object + 3 Component）共 **646 条用例**（通过率 97%+，22 skip 均为 Cloudflare/Angular zone.js/地址校验等不可控环境因素），打通从需求分析到 Allure 报告自动发布 GitHub Pages 的完整链路。核心目标是验证 **AI 协作开发的工程化落地**——通过规则约束、上下文管理、MCP 工具链与 CI/CD 集成，将 AI 从"辅助写代码"提升为"可控的工程生产力"。
 
 **AI Engineering 体系**
 
@@ -64,13 +64,13 @@ src-layout 工程结构 + uv 依赖管理（pyproject.toml + uv.lock）
 
 - **API 可靠性**：基于 OpenAPI 3.0 文档驱动开发——按 Schema 逐字段生成 P2 边界用例，`assert status_code + 核心业务字段` 双重断言
 - **UI 可靠性**：Playwright MCP 浏览器实测 DOM 快照 → 批量 `browser_evaluate` 验证选择器 → 保存 `.playwright-mcp/` 供复用，禁止硬编码脆弱选择器
-- **测试稳定性（三层防护 + skip 准入体系）**：
+- **测试稳定性（三层防护）**：
   - **数据复用优先**：module 级夹具复用用户/购物车/订单，避免高频创建压垮公开测试环境
   - **自动重试**：`pytest-rerunfailures`（`--reruns 2 --reruns-delay 1`），仅触发服务端 5xx 和网络异常，业务断言失败不重试
   - **Fixture/Helper 容错 skip**：夹具 setup 阶段连续重试全部失败后 `pytest.skip` 兜底——区分 Cloudflare 拦截、页面超时、API 数据竞争三类场景
-  - **数据工厂**：`Faker + seed(0) + .unique` 集中管理测试数据生成，47 处散落 `uuid` 全部收敛至 `data_factory.py`，语义化（`generate_unique_slug("e2e-cat")` → `e2e-cat-forest`）且跨环境可复刻
-  - **破坏性测试隔离**：`@pytest.mark.destructive` 标记 + `destructive_user` 牺牲品账号（每次新注册），错误密码/锁定/删除不连累共享 `TEST_USER_*`
-  - **skip 准入规则**：7 条硬约束（禁止 P0/P1 无理由 skip、禁止裸 `except Exception`、禁止同文件 skip 超 50%），从工程层面杜绝 AI 用 skip 掩盖 Bug
+- **数据工厂**：`Faker + seed(0) + .unique` 集中管理测试数据生成，47 处散落 `uuid` 全部收敛至 `data_factory.py`，语义化（`generate_unique_slug("e2e-cat")` → `e2e-cat-forest`）且跨环境可复刻
+- **破坏性测试隔离**：`@pytest.mark.destructive` 标记 + `destructive_user` 牺牲品账号（每次新注册），错误密码/锁定/删除不连累共享 `TEST_USER_*`
+- **skip 准入规则**：7 条硬约束（禁止 P0/P1 无理由 skip、禁止裸 `except Exception`、禁止同文件 skip 超 50%），从工程层面杜绝 AI 用 skip 掩盖 Bug
 
 **CI/CD 双流水线**
 
@@ -85,9 +85,9 @@ src-layout 工程结构 + uv 依赖管理（pyproject.toml + uv.lock）
 
 | 维度 | 数据 |
 |------|------|
-| 测试用例总数 | **637**（通过率 97%+，19 skip 均为不可控环境因素） |
+| 测试用例总数 | **646**（通过率 97%+，22 skip 均为不可控环境因素） |
 | API 模块 / Client 类 | 14 / 15 |
-| UI Page Object / Component | 16 / 3 |
+| UI Page Object / Component | 14 / 3 |
 | 自定义 MCP Server | 1（pytest-runner，FastMCP） |
 | 自定义 Slash Command | 3 |
 | 自定义 Hook | 1（PostToolUse 自动测试） |
@@ -105,7 +105,7 @@ src-layout 工程结构 + uv 依赖管理（pyproject.toml + uv.lock）
 | **Hooks 自动化** | PostToolUse Hook —— Write/Edit 后自动 `uv run pytest`，失败即时反馈 |
 | **工程基础** | src-layout 工程结构 + uv 包管理 + pyproject.toml 配置；Data Factory 集中管理测试数据 |
 | **CI/CD** | GitHub Actions + Jenkins 双流水线，Allure 报告自动发布 GitHub Pages；多环境账号隔离（config.py 统一凭据，CI 动态注入） |
-| **测试架构** | 14 模块 API Client + 16 Page Object + 3 Component；测试稳定性三层防护 + skip 准入规则 + 破坏性测试隔离 |
+| **测试架构** | 14 模块 API Client + 14 Page Object + 3 Component；测试稳定性三层防护 + 数据工厂 + 破坏性测试隔离 + skip 准入规则 |
 
 ---
 
