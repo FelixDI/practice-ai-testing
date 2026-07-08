@@ -93,7 +93,7 @@ src-layout 工程结构 + uv 依赖管理（pyproject.toml + uv.lock）
 | 自定义 Hook | 1（PostToolUse 自动测试） |
 | Data Factory 函数 | 6（`generate_unique_email/slug/product_name/password` + `new_user_data` + `unique_id`） |
 | CI 流水线 | 2 条（GitHub Actions + Jenkins） |
-| 测试用例文档 | 33 篇（API 14 + UI 16 + Integration 1 + Component 2） |
+| 测试用例文档 | 31 篇（API 14 + UI 14 Page + 3 Component） |
 
 **个人职责（全部独立完成）**
 
