@@ -34,7 +34,6 @@ docs/
   test-cases/
     api/             # API 测试用例设计文档
     ui/              # UI 测试用例设计文档
-    integration/     # 集成测试用例设计文档
   practice_software_testing_api.json
 ```
 
