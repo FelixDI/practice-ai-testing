@@ -100,6 +100,52 @@ class CheckoutPage(BasePage):
         """支付方式下拉。"""
         return self._page.locator("[data-test=payment-method]")
 
+    # -- Payment 步骤 (Step 4) 各支付方式专属字段 --------------------------
+
+    # Credit Card
+    @property
+    def credit_card_number(self) -> Locator:
+        return self._page.locator("[data-test=credit_card_number]")
+
+    @property
+    def expiration_date(self) -> Locator:
+        return self._page.locator("[data-test=expiration_date]")
+
+    @property
+    def cvv(self) -> Locator:
+        return self._page.locator("[data-test=cvv]")
+
+    @property
+    def card_holder_name(self) -> Locator:
+        return self._page.locator("[data-test=card_holder_name]")
+
+    # Bank Transfer
+    @property
+    def bank_name(self) -> Locator:
+        return self._page.locator("[data-test=bank_name]")
+
+    @property
+    def account_name(self) -> Locator:
+        return self._page.locator("[data-test=account_name]")
+
+    @property
+    def account_number(self) -> Locator:
+        return self._page.locator("[data-test=account_number]")
+
+    # Buy Now Pay Later
+    @property
+    def monthly_installments(self) -> Locator:
+        return self._page.locator("[data-test=monthly_installments]")
+
+    # Gift Card
+    @property
+    def gift_card_number(self) -> Locator:
+        return self._page.locator("[data-test=gift_card_number]")
+
+    @property
+    def validation_code(self) -> Locator:
+        return self._page.locator("[data-test=validation_code]")
+
     @property
     def finish_button(self) -> Locator:
         """Confirm 按钮（确认下单）。"""
@@ -132,6 +178,23 @@ class CheckoutPage(BasePage):
         """选择支付方式（Step 4）。"""
         self.payment_method.select_option(label=method)
 
+    def fill_payment_details(self, method: str) -> None:
+        """填写各支付方式的专属字段（Step 4，在 select_payment_method 之后调用）。"""
+        if method == "Credit Card":
+            self.credit_card_number.fill("4111111111111111")
+            self.expiration_date.fill("12/28")
+            self.cvv.fill("123")
+            self.card_holder_name.fill("Test User")
+        elif method == "Bank Transfer":
+            self.bank_name.fill("Test Bank")
+            self.account_name.fill("Test User")
+            self.account_number.fill("DE89370400440532013000")
+        elif method == "Buy Now Pay Later":
+            self.monthly_installments.select_option(value="3")
+        elif method == "Gift Card":
+            self.gift_card_number.fill("1234-5678-9012-3456")
+            self.validation_code.fill("ABC123")
+
     def complete_checkout(
         self,
         payment: str = "Cash on Delivery",
@@ -149,4 +212,5 @@ class CheckoutPage(BasePage):
         self.proceed_3.click()
         # Step 4: payment
         self.select_payment_method(payment)
+        self.fill_payment_details(payment)
         self.finish_button.click()

@@ -255,6 +255,7 @@ class TestCheckoutPaymentOptions:
         ]
         for method in expected_methods:
             cp.select_payment_method(method)
+            cp.fill_payment_details(method)
             # 验证选项已选中（finish 按钮变为 enabled 即确认）
             expect(cp.finish_button).to_be_enabled(timeout=3000)
 
