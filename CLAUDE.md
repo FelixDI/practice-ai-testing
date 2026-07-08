@@ -626,14 +626,42 @@ def product(page):
 
 ## CI/CD 规范
 
-### Workflow 触发条件
+### CI 架构
 
-| Workflow | 触发 | 作用 |
-|------|------|------|
-| **Tests** | push/PR 到 main（`src/` `tests/` `scripts/` `pyproject.toml` `uv.lock` `.github/workflows/tests.yml` 变更） | API + UI 并行测试 |
-| **Deploy Allure** | Tests 完成（仅 success） | 生成 API/UI Allure HTML → 发布 GitHub Pages |
+| CI | 状态 | 职责 |
+|------|:--:|------|
+| **Jenkins**（本地 Docker） | 🟢 主力 | API ∥ UI 并行测试 → Allure 报告 → 推送 gh-pages |
+| **GitHub Actions** | 冻结（`workflow_dispatch` 手动触发） | Cloudflare 封 GHA Runner，UI 测试全被跳过 |
 
-> **已知限制**：`practicesoftwaretesting.com` 启用了 Cloudflare 反爬保护，GitHub Actions Runner 可能被拦截（返回 403 或 Cloudflare 挑战页）。CI 已配置 `Check site reachability` 步骤（`scripts/check_site_reachability.py`，Playwright 实测而非 curl）自动检测并跳过 UI 测试。UI 测试以本地执行为准。
+> **GitHub Actions 冻结原因**：`practicesoftwaretesting.com` 启用了 Cloudflare 反爬保护，GitHub Actions Runner IP 被拦截。Jenkins 跑在本机 Docker 不受影响，接管全部 CI 职责。
+
+### Jenkins Pipeline
+
+```
+Setup（uv sync + 注入 Jenkins 账号）
+    ↓
+Tests（API ∥ UI 并行，避免串行耗尽服务器）
+    ↓
+Deploy Allure（生成 HTML → git push -f gh-pages，retry 3 次）
+```
+
+**不论测试结果都推送报告**：pytest 命令以 `|| true` 兜底，junit 步骤配 `allowEmptyResults: true`，确保 Pipeline 不因测试失败而中断。
+
+### gh-pages 发布
+
+根目录 `index.html` 作为入口页：
+
+```html
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=api-allure-report/">
+<title>Allure Reports</title>
+<p>Redirecting to <a href="api-allure-report/">API Allure Report</a>…</p>
+<p><a href="ui-allure-report/">UI Allure Report</a></p>
+```
+
+- 自动跳转 API 报告，同时保留 UI 报告入口
+- Jenkins `retry(3)` 应对 GitHub Pages 偶发拒绝 push
 
 ### CI 失败处理
 
