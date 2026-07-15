@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/on-test-change.sh",
+            "args": [],
+            "if": "Edit(tests/**/*) || Write(tests/**/*)",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pytest-runner": {
+      "command": "uv",
+      "args": ["run", "python", "src/common/pytest_mcp_server.py"]
+    }
+  }
+}

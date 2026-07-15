@@ -300,59 +300,100 @@ claude mcp add -s user playwright -- \
 
 ---
 
-## 问题 14：VSCode 插件沙箱 vs CLI 终端 —— 两套 MCP 配置源
+## 问题 14：MCP 配置架构 —— 三层、两入口、各自独立
 
-**现象**：用 `claude mcp add -s user` 配置 Playwright MCP 后，终端 `claude` CLI 中工具正常可用。但 VSCode 插件里打开同一个项目，Playwright 工具列表为空。
+**现象**：Claude Code 的 MCP 配置散落在三个文件、两个入口中。配置看起来都正确，但某个入口就是读不到工具。
 
-**根因**：Claude Code 的 CLI 和 VSCode 插件读取不同的 MCP 配置源：
+**根因**：Claude Code 的 CLI 和 VSCode 插件读取不同的 MCP 配置源，互不感知。
 
-| 入口 | 配置源 | 写入方式 |
-|------|------|------|
-| 终端 CLI | `~/.claude.json` | `claude mcp add -s user` |
-| VSCode 插件沙箱 | `~/.claude/mcp.json` | 手动编辑 |
+**最终架构图**（你项目实际生效的三层）：
 
-CLI 能正常 spawn 二进制可执行文件，但 VSCode 插件运行在沙箱环境中，对 shebang 脚本的解析更严格。因此 `mcp.json` 需要用 `/bin/sh -c` 包装：
+```
+~/.claude.json                CLI 入口（claude mcp add 写入）
+├── mcpServers（全局层 → 所有项目）
+│   ├── playwright   = /opt/homebrew/bin/node cli.js
+│   └── github       = /opt/homebrew/bin/github-mcp-server stdio
+│
+└── projects/practice-ai-testing/mcpServers（→ 项目层，仅本项目）
+    └── pytest-runner = uv run src/common/pytest_mcp_server.py
 
-```json
-// ✅ VSCode 插件沙箱兼容配置 —— 必须用 shell 包装
-{
-  "playwright": {
-    "command": "/bin/sh",
-    "args": ["-c", "/opt/homebrew/bin/node /opt/homebrew/lib/node_modules/@playwright/mcp/cli.js"]
-  }
-}
+
+~/.claude/mcp.json            VSCode/Cursor 沙箱入口（手写，全局）
+├── playwright   = /bin/sh -c "node cli.js"     ← 需 shell 包装
+└── github       = /opt/homebrew/bin/github-mcp-server stdio
+
+
+项目/.claude/.mcp.json        VSCode 项目层（手写，仅本项目）
+└── pytest-runner = uv run src/common/pytest_mcp_server.py
 ```
 
-**容易犯的错误**：以为 CLI 能用了 VSCode 也能用，或者反过来只配了一个文件以为全平台通用。实际上需要**双端维护**——`~/.claude.json` 给 CLI，`~/.claude/mcp.json` 给 VSCode 插件。
+**书写差异对比**：
 
-**解决方案**：
-1. `~/.claude.json`：用 `claude mcp add -s user` 写入，服务 CLI
-2. `~/.claude/mcp.json`：手写 `/bin/sh -c` 包装格式，服务 VSCode 插件沙箱
-3. 两端配置要保持同步（相同的入口文件路径、相同的 browser/executable-path 参数）
+| 入口 | 配置源 | playwright | github | 写入 |
+|------|--------|-----------|--------|------|
+| CLI | `~/.claude.json` | `node cli.js`（绝对路径） | `github-mcp-server stdio` | `claude mcp add` |
+| VSCode 全局 | `~/.claude/mcp.json` | `/bin/sh -c "node cli.js"`（包装） | 同上 | 手写 |
+| VSCode 项目 | `项目/.claude/.mcp.json` | 不在此处 | 不在此处 | 手写 |
 
-**清理多余参数**：早期尝试过程中在 `mcp.json` 里加了 `--browser chromium`、`--headless`、`--test-id-attribute "data-test"`。这些 flag 要么无效（`chromium` 不是有效值），要么与需求相反（加了 `--headless` 就看不到浏览器窗口），要么是默认值（`data-test` 本来就默认）。最终清理为纯路径配置。
+**配错的后果**：
+
+| 错误 | 现象 | 修复 |
+|------|------|------|
+| playwright 的 `npx` shebang 在 CLI 无法启动 | CLI 工具列表不出现 | command 用绝对路径 node + 绝对路径 cli.js |
+| playwright 在 `mcp.json` 没加 `/bin/sh -c` | VSCode 沙箱无工具列表 | command 用 `/bin/sh -c "..."` |
+| 项目层 github 配了旧二进制名 `mcp-server-github` | `/mcp` 显示 1 not connected | 删除项目层 github（全局层已够） |
+| `mcp.json` 里写 pytest-runner（无项目隔离） | 新项目也尝试启动 | 移到 `项目/.claude/.mcp.json` |
 
 ---
 
-## MCP 工具链集成阶段工程规范总汇
+## 问题 15：GitHub MCP Server 从 Anthropic 迁移到 GitHub 官方
+
+**现象**：终端提示 `Package no longer supported`，旧包 `@modelcontextprotocol/server-github` 已被社区废弃，并且 `/mcp` 显示 "1 not connected"。
+
+**根因**：
+
+| 阶段 | 包名 | 维护方 | 工具数 |
+|------|------|------|:--:|
+| 旧 | `@modelcontextprotocol/server-github` | Anthropic（MCP 官方，2025.4.8，已停维） | ~20 |
+| 新 | `github/github-mcp-server` | **GitHub 自己**（v1.5.0，29.8K stars） | **~80** |
+
+**两个问题同时出现**：
+
+1. 旧二进制名 `mcp-server-github`（词序错误）。新包的二进制名是 `github-mcp-server`，需要配合 `stdio` 子命令启动。
+2. `~/.claude.json` 的项目作用域遗留着旧配置，因为它在 `projects/xxx/mcpServers` 下，修改全局 `mcpServers` 不会自动同步过去。
+
+**解决方案**：
+1. `brew install github-mcp-server` 安装新包
+2. 更新 **三处**配置：`~/.claude.json` 全局层 + `~/.claude.json` 项目层 + `~/.claude/mcp.json`
+3. 项目层删除 github（只留 pytest-runner），避免配置强关联
+
+```bash
+# 新二进制用法
+github-mcp-server stdio      # 需要 stdio 子命令
+```
+
+---
+
+## 工程规范总汇
 
 | 规范类别 | 规范内容 | 解决的问题 |
 |---------|---------|----------|
-| MCP 配置入口 | MCP server 必须用 `claude mcp add -s user` 写入 `~/.claude.json`，禁止手写 `~/.claude/mcp.json` | 配置源冲突导致 server 被静默跳过 |
-| MCP 命令格式 | command 使用绝对路径二进制，`args` 使用绝对路径脚本；禁止 `command: npx` | shebang 脚本 Claude Code 无法执行 |
+| 三层配置架构 | `~/.claude.json`（CLI 全局+项目层）+ `~/.claude/mcp.json`（VSCode 全局）+ `项目/.claude/.mcp.json`（VSCode 项目层）互不读取，双端分别维护 | 某入口工具列表为空 |
+| 作用域隔离 | 全局层放通用工具（playwright + github），项目层放专用工具（pytest-runner） | 新项目误启动不存在的 server |
+| CLI 命令格式 | `~/.claude.json`：用 `claude mcp add` 写入，command 用绝对路径 node + 绝对路径入口文件 | shebang 脚本无法解析 |
+| VSCode 格式 | `~/.claude/mcp.json`：手写，playwright 需 `/bin/sh -c` 包装，github 加 `stdio` 参数 | VSCode 沙箱无法 spawn shebang |
 | 浏览器选择 | `--browser` 仅支持 chrome/firefox/webkit/msedge；使用已安装的 Chromium 需 `--executable-path` | "chromium" 不是有效 browser 值 |
-| **双端配置** | **`~/.claude.json`（CLI）和 `~/.claude/mcp.json`（VSCode 插件）需分别维护，两端配置保持一致** | **VSCode 插件工具列表为空** |
+| GitHub Server | 从 `@modelcontextprotocol/server-github`（停维）迁移到 `github-mcp-server stdio`，新二进制词序不同 | 旧包已废弃，新包 80 工具 |
 | MCP 验证流程 | 新配置后检查 `~/Library/Caches/claude-cli-nodejs/.../mcp-logs-{name}/` 确认进程启动 | 判断是配置问题还是启动问题 |
 | MCP 输出目录 | `.playwright-mcp/` 加入 `.gitignore` | 截图/快照/日志不进入版本库 |
 
-## 踩坑经验总结（本阶段新增）
+## 踩坑经验总结
 
-- **配置文件优先级不是直觉的**：`mcp.json` ≠ `.claude.json`，`claude mcp add` 才写入可靠配置
-- **可执行 vs shebang 是硬门槛**：Claude Code 的 MCP launcher 只能 spawn 二进制，不能解析 `#!/usr/bin/env node`
+- **三层、两入口、互不感知**：CLI 读 `~/.claude.json`，VSCode 沙箱读 `~/.claude/mcp.json` + `项目/.claude/.mcp.json`，修改一个不代表另一个也生效
+- **作用域决定你的 server 会不会跨项目炸**：全局层（playwright+github）所有项目通用；项目层（pytest-runner）仅当前项目。放错层就出现"新项目启动没有的 server"
+- **可执行 vs shebang 是硬门槛**：Claude Code 的 MCP launcher 只能 spawn 二进制，不能解析 `#!/usr/bin/env node`。VSCode 沙箱还要额外加 `/bin/sh -c` 包装
 - **工具不出现 = 沉默失败**：Claude Code 不会提示 MCP server 启动失败，只能通过日志目录是否存在来判断
-- **CLI 能用 ≠ VSCode 能用**：两套配置源、两套进程环境，必须双端维护
-- **`/bin/sh -c` 是 VSCode 沙箱的通行证**：shell 包装让沙箱能间接调用 shebang 脚本
-- **MCP 不是万能胶**：`@playwright/mcp`（浏览器）的价值远大于 API MCP——因为 AI 需要"眼睛"看 DOM，但 API 这端 AI 直接读代码就够
+- **`settings.local.json` 的 schema 校验**：Claude Code 对 settings.json 系列文件有内置 JSON Schema 校验，`additionalDirectories` 必须放在 `permissions` 下
 
 ---
 
